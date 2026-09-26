@@ -1,0 +1,81 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: waterwatch-platform-india
+  profiles:
+    active: dev
+
+  datasource:
+    url: jdbc:h2:file:./data/waterwatch;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
+    driverClassName: org.h2.Driver
+    username: sa
+    password: 
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 30MB
+
+  mail:
+    host: localhost
+    port: 25
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 16
+        queue-capacity: 100
+      thread-name-prefix: waterwatch-task-
+
+waterwatch:
+  storage:
+    upload-dir: ./uploads
+    reports-dir: ./generated-reports
+  clustering:
+    eps-meters: 150.0
+    min-points: 3
+    escalation-threshold: 5
+    cron-enabled: true
+    cron-expression: "0 */2 * * * *"
+  dispatch:
+    simulation-mode: true
+    default-sender-email: alerts@waterwatch.civic.gov.in
+    webhook-timeout-ms: 4000
+  geo:
+    country: "India"
+    default-lat: 28.6320
+    default-lon: 77.2105
+    default-city: "National Capital Territory of Delhi, India"
+    helpline: "1916"
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method

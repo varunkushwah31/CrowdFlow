@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WaterWatch India - Civic Water Issue Crowdsourcing &amp; Spatial Monolith</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+  
+  <!-- Custom Application Styles -->
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <!-- Top Navigation & Header -->
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="logo-icon">
+        <i class="fa-solid fa-droplet"></i>
+      </div>
+      <div class="logo-title">
+        <h1>WaterWatch India</h1>
+        <p>National Civic Water Crowdsourcing, Spatial DBSCAN &amp; Jal Board Escalation Platform</p>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="header-nav">
+      <button class="nav-tab-btn active" data-tab="tab-map">
+        <i class="fa-solid fa-map-location-dot"></i> Live Indian Map &amp; Heatmap
+      </button>
+      <button class="nav-tab-btn" data-tab="tab-report">
+        <i class="fa-solid fa-camera"></i> Report Water Hazard
+      </button>
+      <button class="nav-tab-btn" data-tab="tab-operations">
+        <i class="fa-solid fa-triangle-exclamation"></i> Municipal Operations
+      </button>
+      <button class="nav-tab-btn" data-tab="tab-wards">
+        <i class="fa-solid fa-building-shield"></i> Indian Municipal Wards
+      </button>
+      <button class="nav-tab-btn" data-tab="tab-dispatch">
+        <i class="fa-solid fa-paper-plane"></i> Dispatch Logs
+      </button>
+      <a href="/swagger-ui.html" target="_blank" class="nav-tab-btn" style="text-decoration:none;">
+        <i class="fa-solid fa-code"></i> OpenAPI / Swagger
+      </a>
+    </nav>
+
+    <!-- Header Badges -->
+    <div class="header-badges">
+      <div class="header-badge" style="background: rgba(14, 165, 233, 0.15); border-color:#0284c7;">
+        <i class="fa-solid fa-phone-volume" style="color: #38bdf8;"></i> Helpline: 1916 (Jal Board)
+      </div>
+      <div class="header-badge" id="system-status-badge">
+        <i class="fa-solid fa-circle" style="color: #22c55e; font-size: 8px;"></i> Java 25 &amp; PostGIS/JTS
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Viewport -->
+  <main class="main-wrapper">
+
+    <!-- Left Interactive Panel -->
+    <aside class="sidebar">
+
+      <!-- TAB 1: LIVE MAP CONTROLS & RECENT INCIDENTS -->
+      <div id="tab-map" class="tab-content-panel">
+        
+        <!-- Metrics Bar -->
+        <div class="panel-section">
+          <div class="section-heading">
+            <span>Civic Infrastructure Pulse (India)</span>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-data" title="Refresh Live Data">
+              <i class="fa-solid fa-rotate"></i>
+            </button>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-num" id="stat-total-reports">0</div>
+              <div class="stat-label">Citizen Grievances</div>
+            </div>
+            <div class="stat-card warning">
+              <div class="stat-num" id="stat-active-clusters">0</div>
+              <div class="stat-label">DBSCAN Clusters</div>
+            </div>
+            <div class="stat-card critical">
+              <div class="stat-num" id="stat-critical-alerts">0</div>
+              <div class="stat-label">Critical Escalations</div>
+            </div>
+            <div class="stat-card success">
+              <div class="stat-num" id="stat-resolved-reports">0</div>
+              <div class="stat-label">Restored Hotspots</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layer & Filter Controls -->
+        <div class="panel-section">
+          <div class="section-heading">Geospatial Visualization Layers</div>
+          <div class="layer-controls">
+            <button class="layer-toggle active" id="layer-toggle-pins">
+              <i class="fa-solid fa-location-dot"></i> Citizen Pins
+            </button>
+            <button class="layer-toggle active" id="layer-toggle-heatmap">
+              <i class="fa-solid fa-fire-flame-curved"></i> Thermal Heatmap
+            </button>
+            <button class="layer-toggle active" id="layer-toggle-clusters">
+              <i class="fa-solid fa-draw-polygon"></i> DBSCAN Convex Hulls
+            </button>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <label class="form-label">Filter by Issue Category</label>
+            <select class="form-select" id="filter-issue-type">
+              <option value="ALL">All Water Hazard Types</option>
+              <option value="BURST_PIPE">Main Pipeline Burst / Jal Board Rupture</option>
+              <option value="LEAKAGE">Pipeline Seepage / Road Curb Leak</option>
+              <option value="CONTAMINATION">Contaminated / Turbid Tap Water</option>
+              <option value="SEVERE_WATERLOGGING">Severe Waterlogging / Underpass</option>
+              <option value="DRAINAGE_OVERFLOW">Open Nallah / Choked Drain Overflow</option>
+              <option value="OPEN_SEWAGE">Open Sewage &amp; Manhole Hazard</option>
+              <option value="LOW_PRESSURE">Extremely Low Water Pressure</option>
+              <option value="WATER_SCARCITY">No Municipal Supply / Tanker Delay</option>
+              <option value="BOREWELL_DEPLETION">Borewell Dried Up / Groundwater</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Incident Stream -->
+        <div class="panel-section" style="flex:1;">
+          <div class="section-heading">
+            <span>Verified Citizen Grievances</span>
+            <span id="reports-count-badge" class="badge badge-status">0 Items</span>
+          </div>
+          <div id="reports-list-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: CITIZEN INCIDENT REPORTING WITH AUTOMATED EXIF -->
+      <div id="tab-report" class="tab-content-panel" style="display: none;">
+        <div class="panel-section">
+          <div class="section-heading">
+            <span>Citizen Incident Intake</span>
+            <span class="badge badge-low">Automated EXIF Extraction</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+            Take or upload a photo of the water issue. The platform automatically extracts embedded camera EXIF GPS coordinates, timestamp, and mobile hardware.
+          </p>
+
+          <form id="incident-report-form">
+            
+            <!-- Media Upload with EXIF Extraction -->
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-camera"></i> Photo or Video Media</label>
+              <input type="file" id="report-file-input" class="form-input" accept="image/*,video/mp4"/>
+              
+              <!-- EXIF Preview Box -->
+              <div id="exif-preview" class="exif-preview-card">
+                <div><i class="fa-solid fa-satellite"></i> <strong>Embedded EXIF GPS Detected!</strong></div>
+                <div id="exif-lat-lon" style="margin-top:2px;"></div>
+                <div id="exif-device" style="color:#15803d; font-size:11px;"></div>
+                <div id="exif-time" style="color:#15803d; font-size:11px;"></div>
+              </div>
+
+              <!-- Indian Civic Demo Preloaders -->
+              <div style="margin-top: 8px; display: flex; gap: 6px;">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-demo-burst">
+                  <i class="fa-solid fa-vial"></i> Karol Bagh Feeder Burst
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-demo-contamination">
+                  <i class="fa-solid fa-vial"></i> Mayur Vihar Sewage Mixing
+                </button>
+              </div>
+            </div>
+
+            <!-- Issue Type Dropdown -->
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-list-check"></i> Categorize Water Issue</label>
+              <select id="report-issue-type" class="form-select" required>
+                <option value="BURST_PIPE">Main Pipeline Burst / Jal Board Rupture</option>
+                <option value="LEAKAGE" selected>Visible Pipeline Seepage / Road Curb Leak</option>
+                <option value="CONTAMINATION">Contaminated / Turbid Tap Water (Sewage Mixing)</option>
+                <option value="SEVERE_WATERLOGGING">Severe Waterlogging / Underpass Inundation</option>
+                <option value="DRAINAGE_OVERFLOW">Open Nallah / Choked Stormwater Drain</option>
+                <option value="OPEN_SEWAGE">Open Sewage &amp; Overflowing Manhole</option>
+                <option value="LOW_PRESSURE">Extremely Low Pressure / Booster Failure</option>
+                <option value="WATER_SCARCITY">No Municipal Supply / Tanker Delay</option>
+                <option value="BOREWELL_DEPLETION">Borewell Dried Up / Groundwater Depletion</option>
+                <option value="OTHER">Other Water Infrastructure Hazard</option>
+              </select>
+            </div>
+
+            <!-- Location Coordinates -->
+            <div class="form-group">
+              <label class="form-label">
+                <i class="fa-solid fa-location-crosshairs"></i> Exact Coordinates (WGS 84, India Grid)
+              </label>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <input type="number" step="0.000001" id="report-latitude" class="form-input" placeholder="Latitude" value="28.6445" required/>
+                <input type="number" step="0.000001" id="report-longitude" class="form-input" placeholder="Longitude" value="77.1950" required/>
+              </div>
+              <small style="color:var(--text-muted); font-size:11px;">
+                Auto-filled from EXIF or map click anywhere in India.
+              </small>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-align-left"></i> Description &amp; Visual Symptoms</label>
+              <textarea id="report-description" class="form-textarea" placeholder="Describe the water issue, water color, pressure, nearest metro station or landmark..."></textarea>
+            </div>
+
+            <!-- Citizen Details -->
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-user"></i> Citizen Details (For SMS/WhatsApp Feedback)</label>
+              <input type="text" id="report-citizen-name" class="form-input" placeholder="Full Name (e.g., Rajesh Malhotra)" style="margin-bottom:6px;"/>
+              <input type="email" id="report-citizen-email" class="form-input" placeholder="Email Address (e.g., citizen@gmail.com)" style="margin-bottom:6px;"/>
+              <input type="tel" id="report-citizen-phone" class="form-input" placeholder="Mobile Number (e.g., +91 98110 54321)"/>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="btn-submit-report">
+              <i class="fa-solid fa-paper-plane"></i> Submit Grievance Report
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- TAB 3: MUNICIPAL OPERATIONS & ROOT CAUSE CORRELATION -->
+      <div id="tab-operations" class="tab-content-panel" style="display: none;">
+        <div class="panel-section">
+          <div class="section-heading">
+            <span>DBSCAN Spatial Engine</span>
+            <span class="badge badge-high">Root Cause AI</span>
+          </div>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+            Groups multiple complaints within spatial proximity (150m) and deduces systemic root causes (e.g. burst pipe + flooding + low pressure => Jal Board Main Feeder Fracture).
+          </p>
+
+          <div style="background:#f1f5f9; padding:10px; border-radius:6px; margin-bottom:12px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+              <div>
+                <label class="form-label" style="font-size:11px;">Radius (eps meters)</label>
+                <input type="number" id="clustering-eps" class="form-input" value="150" min="50" max="1000"/>
+              </div>
+              <div>
+                <label class="form-label" style="font-size:11px;">Min Points (minPts)</label>
+                <input type="number" id="clustering-minpts" class="form-input" value="3" min="2" max="20"/>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm btn-block" id="btn-run-clustering">
+              <i class="fa-solid fa-brain"></i> Execute Spatial DBSCAN &amp; Correlate
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-section" style="flex:1;">
+          <div class="section-heading">
+            <span>Active Incident Clusters</span>
+            <span id="clusters-count-badge" class="badge badge-critical">0 Active</span>
+          </div>
+          <div id="clusters-list-container">
+            <!-- Dynamically populated clusters -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: MUNICIPAL WARDS DIRECTORY (INDIA) -->
+      <div id="tab-wards" class="tab-content-panel" style="display: none;">
+        <div class="panel-section">
+          <div class="section-heading">
+            <span>Indian Municipal Wards &amp; Emergency Routing</span>
+          </div>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">
+            Spatial containment maps incidents directly to the responsible Executive Engineer (EE - Water) and Zonal Emergency Control Room.
+          </p>
+          <div id="wards-list-container">
+            <!-- Dynamically populated wards -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: DISPATCH AUDIT LOGS -->
+      <div id="tab-dispatch" class="tab-content-panel" style="display: none;">
+        <div class="panel-section">
+          <div class="section-heading">
+            <span>Jal Board Escalation Audit Logs</span>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-dispatch">
+              <i class="fa-solid fa-rotate"></i>
+            </button>
+          </div>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">
+            Audit trail of automated governmental emails, REST API webhooks, and citizen SMS notifications.
+          </p>
+          <div id="dispatch-logs-container">
+            <!-- Dynamically populated logs -->
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Center/Right Interactive Map Canvas -->
+    <div id="map"></div>
+
+  </main>
+
+  <!-- Modal: Update Cluster Status & Notify Citizens -->
+  <div class="modal-overlay" id="status-modal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title" id="status-modal-title">Update Grievance Status</h3>
+        <button class="modal-close" id="modal-close-btn">&times;</button>
+      </div>
+      <div>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
+          Updating this cluster will <strong>automatically notify all contributed Indian citizens</strong> via SMS/WhatsApp feedback loop and update the public dashboard in real-time.
+        </p>
+        <input type="hidden" id="modal-cluster-id"/>
+        <div class="form-group">
+          <label class="form-label">New Operational Status</label>
+          <select id="modal-new-status" class="form-select">
+            <option value="IN_PROGRESS">IN PROGRESS - Jal Board Repair Crew Dispatched on Site</option>
+            <option value="RESOLVED">RESOLVED - Pipeline Restored &amp; Supply Normalized</option>
+            <option value="UNDER_INVESTIGATION">UNDER INVESTIGATION - Acoustic Leak Survey Underway</option>
+            <option value="CLOSED">CLOSED - Field Inspection Verified by Ward Corporator</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Resolution Work Notes / Feedback for Citizens</label>
+          <textarea id="modal-status-notes" class="form-textarea" placeholder="e.g., Replacement of 450mm feeder sleeve completed at Pusa Road. Potable pressure normalized. Helpline: 1916."></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+          <button class="btn btn-primary" id="modal-submit-status-btn">
+            <i class="fa-solid fa-paper-plane"></i> Save &amp; Notify Citizens
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JavaScript -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Leaflet Heatmap Plugin -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <!-- Application Logic -->
+  <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Municipal Water Infrastructure Incident Dossier - India</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 14mm 16mm 14mm 16mm;
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 8pt;
+                color: #64748b;
+            }
+            @bottom-left {
+                content: "WaterWatch India Civic Platform | Jal Jeevan / AMRUT Escalation Framework";
+                font-family: Arial, sans-serif;
+                font-size: 8pt;
+                color: #64748b;
+            }
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            color: #1e293b;
+            margin: 0;
+            padding: 0;
+            font-size: 10pt;
+            line-height: 1.45;
+        }
+
+        .header {
+            border-bottom: 3px solid #0284c7;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .title-area h1 {
+            color: #0f172a;
+            font-size: 16pt;
+            margin: 0 0 3px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .title-area p {
+            color: #64748b;
+            margin: 0;
+            font-size: 8.5pt;
+            font-weight: bold;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 8.5pt;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+
+        .badge-critical { background-color: #dc2626; }
+        .badge-high { background-color: #ea580c; }
+        .badge-medium { background-color: #d97706; }
+        .badge-low { background-color: #2563eb; }
+
+        .meta-card {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+        }
+
+        .grid-2 {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .grid-2 td {
+            vertical-align: top;
+            width: 50%;
+            padding: 3px 6px;
+        }
+
+        .label {
+            color: #64748b;
+            font-size: 8pt;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .value {
+            color: #0f172a;
+            font-size: 9pt;
+            font-weight: 600;
+        }
+
+        .section-title {
+            color: #0284c7;
+            font-size: 11pt;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 4px;
+            margin-top: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .alert-box {
+            background-color: #fef2f2;
+            border-left: 4px solid #dc2626;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .alert-box.high {
+            background-color: #fff7ed;
+            border-left-color: #ea580c;
+        }
+
+        .action-box {
+            background-color: #eff6ff;
+            border-left: 4px solid #0284c7;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            border-radius: 0 4px 4px 0;
+        }
+
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            margin-bottom: 12px;
+            font-size: 8.5pt;
+        }
+
+        table.data-table th {
+            background-color: #f1f5f9;
+            color: #334155;
+            text-align: left;
+            padding: 6px 8px;
+            border-bottom: 2px solid #cbd5e1;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        table.data-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #1e293b;
+        }
+
+        table.data-table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .gallery-card {
+            border: 1px solid #cbd5e1;
+            background-color: #ffffff;
+            border-radius: 4px;
+            padding: 4px;
+            text-align: center;
+        }
+
+        .gallery-card img {
+            max-width: 100%;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 2px;
+        }
+
+        .gallery-caption {
+            font-size: 7.5pt;
+            color: #475569;
+            margin-top: 3px;
+        }
+
+        .footer-signoff {
+            margin-top: 18px;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 10px;
+            font-size: 8pt;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <table style="width: 100%;">
+            <tr>
+                <td class="title-area" style="width: 70%;">
+                    <h1>MUNICIPAL INFRASTRUCTURE INCIDENT DOSSIER</h1>
+                    <p>GOVERNMENT OF NCT OF DELHI | DELHI JAL BOARD &amp; CIVIC GRIEVANCE COMMAND</p>
+                </td>
+                <td style="width: 30%; text-align: right;">
+                    <div th:class="'badge badge-' + ${#strings.toLowerCase(cluster.severity.name())}"
+                         th:text="${cluster.severity.label}">CRITICAL DISPATCH</div>
+                    <div style="font-size: 8pt; color: #64748b; margin-top: 4px;">
+                        Grievance Status: <strong th:text="${cluster.status.name()}">ESCALATED</strong>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Cluster Metadata Grid -->
+    <div class="meta-card">
+        <table class="grid-2">
+            <tr>
+                <td>
+                    <div class="label">Incident Cluster Code</div>
+                    <div class="value" th:text="${cluster.clusterCode}">IND-CLUST-2026-85</div>
+                </td>
+                <td>
+                    <div class="label">Target Municipal Ward &amp; Zone</div>
+                    <div class="value" th:text="${ward != null ? ward.wardName + ' (' + ward.zoneName + ')' : 'Delhi Municipal Area'}">Ward 85 - Karol Bagh</div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div class="label">Competent Authority / Engineer</div>
+                    <div class="value" th:text="${ward != null ? ward.officerName + ' [' + ward.officerDesignation + ']' : 'Executive Engineer (EE - Water)'}">Officer</div>
+                </td>
+                <td>
+                    <div class="label">Emergency Zonal Helpline</div>
+                    <div class="value" th:text="${ward != null ? ward.emergencyHotline : '1916 (Delhi Jal Board Toll-Free)'}">1916</div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div class="label">GPS Centroid (WGS 84, India Grid)</div>
+                    <div class="value" th:text="${#numbers.formatDecimal(cluster.centroidLat, 1, 5) + ', ' + #numbers.formatDecimal(cluster.centroidLon, 1, 5)}">28.6445, 77.1950</div>
+                </td>
+                <td>
+                    <div class="label">Spatial Radius &amp; Extent</div>
+                    <div class="value" th:text="${cluster.radiusMeters + ' meters impact zone'}">140m</div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div class="label">First Citizen Grievance</div>
+                    <div class="value" th:text="${#temporals.format(cluster.firstReportedAt, 'dd MMM yyyy HH:mm')} + ' IST'">Time</div>
+                </td>
+                <td>
+                    <div class="label">Dossier Generated &amp; Dispatched</div>
+                    <div class="value" th:text="${#temporals.format(generatedAt, 'dd MMM yyyy HH:mm:ss')} + ' IST'">Time</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Root Cause Analysis Section -->
+    <div class="section-title">Root Cause Deduction &amp; Pattern Recognition (DBSCAN)</div>
+    <div th:class="'alert-box ' + (${cluster.severity.name() == 'CRITICAL'} ? '' : 'high')">
+        <div style="font-weight: bold; font-size: 10.5pt; color: #991b1b;" th:text="${cluster.rootCauseHypothesis}">
+            Major Sub-Surface Water Transmission Main Fracture
+        </div>
+        <div style="margin-top: 4px; font-size: 9pt;" th:text="${cluster.technicalAnalysis}">
+            Pattern analysis of citizen grievances indicates transmission line breach.
+        </div>
+        <div style="margin-top: 6px; font-size: 8pt; color: #475569;">
+            AI Correlation Confidence: <strong th:text="${#numbers.formatDecimal(cluster.confidenceScore, 1, 1) + '%'}">96.0%</strong>
+            | Correlated Citizen Complaints: <strong th:text="${cluster.reportCount}">5</strong> verified reports
+        </div>
+    </div>
+
+    <!-- Recommended Operational Response -->
+    <div class="action-box">
+        <div style="font-weight: bold; font-size: 9pt; color: #0369a1; text-transform: uppercase;">
+            Mandatory Action Checklist for Jal Board / Municipal Field Squad:
+        </div>
+        <div style="margin-top: 4px; font-size: 9pt; color: #0f172a;" th:text="${cluster.recommendedAction}">
+            Dispatch Emergency Crew. Isolate Sluice Valve SV-04B.
+        </div>
+    </div>
+
+    <!-- Citizen Complaints Evidence Table -->
+    <div class="section-title">Verified Citizen Grievances Log</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 14%;">Code</th>
+                <th style="width: 20%;">Issue Type</th>
+                <th style="width: 32%;">Location / Street Landmark</th>
+                <th style="width: 16%;">Time (IST)</th>
+                <th style="width: 18%;">Citizen / Contact</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="r : ${reports}">
+                <td><strong th:text="${r.reportCode}">IND-H2O-01</strong></td>
+                <td th:text="${r.issueType.displayName}">Burst Pipe</td>
+                <td th:text="${r.address}">Pusa Road, Karol Bagh</td>
+                <td th:text="${#temporals.format(r.reportedAt, 'dd MMM HH:mm')}">14:20</td>
+                <td th:text="${r.citizenName != null ? r.citizenName : 'Citizen (India)'}">Citizen</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Photographic Evidence Gallery -->
+    <div class="section-title">Crowdsourced Geotagged Photographic Evidence</div>
+    <div style="font-size: 8pt; color: #64748b; margin-bottom: 8px;">
+        Photos captured via mobile app with embedded camera EXIF verification.
+    </div>
+
+    <table style="width: 100%;">
+        <tr>
+            <td th:each="img, stat : ${photoEvidence}" style="width: 33%; padding: 4px; vertical-align: top;">
+                <div class="gallery-card">
+                    <img th:src="${img.imageUrl}" alt="Crowdsourced Water Hazard Photo"/>
+                    <div class="gallery-caption">
+                        <strong th:text="${img.reportCode}">IND-01</strong><br/>
+                        <span th:text="${img.issueType}">Rupture</span><br/>
+                        <span th:text="${img.address}">Delhi</span>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="footer-signoff">
+        <p>This dossier is an official municipal dispatch generated automatically by the <strong>WaterWatch India Civic Crowdsourcing Platform</strong> under National Jal Jeevan Mission and AMRUT 2.0 urban infrastructure monitoring guidelines. Dispatched to designated Jal Board Executive Engineers and Ward Control Centers.</p>
+    </div>
+
+</body>
+</html>
