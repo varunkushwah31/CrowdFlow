@@ -90,4 +90,12 @@ public class IncidentReportController {
     public ResponseEntity<List<WaterReportResponseDto>> getReportsByCluster(@PathVariable Long clusterId) {
         return ResponseEntity.ok(reportService.getReportsByCluster(clusterId));
     }
+
+    @GetMapping("/track/{reportCode}")
+    @Operation(summary = "Track citizen water grievance by unique report tracking code (e.g. IND-H2O-1686)")
+    public ResponseEntity<WaterReportResponseDto> trackReport(@PathVariable String reportCode) {
+        return reportService.getReportByCode(reportCode)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

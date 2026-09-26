@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initMap();
   initTabNavigation();
   initEventListeners();
+  initAuthAndTracking();
   loadAllData();
 });
 
@@ -698,5 +699,177 @@ function getIconForIssue(type) {
     case "SEVERE_WATERLOGGING": return "fa-cloud-showers-heavy";
     case "DRAINAGE_OVERFLOW": return "fa-arrow-down-up-across-line";
     default: return "fa-droplet";
+  }
+}
+
+// ==========================================================
+// Indian Mobile OTP Authentication & Grievance Tracking
+// ==========================================================
+function initAuthAndTracking() {
+  const authModal = document.getElementById("auth-modal");
+  const btnHeaderAuth = document.getElementById("btn-header-auth");
+  const authCloseBtn = document.getElementById("auth-modal-close-btn");
+  const authCancelBtn = document.getElementById("auth-cancel-btn");
+  const btnSendOtp = document.getElementById("btn-send-otp");
+  const btnVerifyOtp = document.getElementById("btn-verify-otp");
+  const btnTrackCode = document.getElementById("btn-track-code");
+  const trackCodeInput = document.getElementById("track-code-input");
+
+  // Restore saved session
+  const savedToken = localStorage.getItem("crowdflow_jwt");
+  const savedRole = localStorage.getItem("crowdflow_role");
+  const savedPhone = localStorage.getItem("crowdflow_phone");
+  if (savedToken && savedPhone) {
+    document.getElementById("auth-status-text").textContent = `${savedRole === "ROLE_WARD_OFFICER" ? "Officer" : "Citizen"}: ${savedPhone}`;
+  }
+
+  // Open / Close Auth Modal
+  if (btnHeaderAuth) {
+    btnHeaderAuth.addEventListener("click", () => {
+      authModal.style.display = "flex";
+    });
+  }
+  if (authCloseBtn) authCloseBtn.addEventListener("click", () => authModal.style.display = "none");
+  if (authCancelBtn) authCancelBtn.addEventListener("click", () => authModal.style.display = "none");
+
+  // Send OTP
+  if (btnSendOtp) {
+    btnSendOtp.addEventListener("click", async () => {
+      const phone = document.getElementById("auth-phone").value.trim();
+      if (!phone) return alert("Please enter mobile number (+91)");
+
+      btnSendOtp.disabled = true;
+      btnSendOtp.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sending...`;
+
+      try {
+        const res = await fetch("/api/auth/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phoneNumber: phone })
+        });
+        const data = await res.json();
+        document.getElementById("auth-otp-sent-hint").style.display = "block";
+        document.getElementById("auth-demo-otp-val").textContent = data.demoOtp || "123456";
+        document.getElementById("auth-otp").value = data.demoOtp || "123456";
+      } catch (e) {
+        alert("Failed to send OTP: " + e.message);
+      } finally {
+        btnSendOtp.disabled = false;
+        btnSendOtp.innerHTML = `<i class="fa-solid fa-sms"></i> Send OTP`;
+      }
+    });
+  }
+
+  // Verify OTP & Sign In
+  if (btnVerifyOtp) {
+    btnVerifyOtp.addEventListener("click", async () => {
+      const phone = document.getElementById("auth-phone").value.trim();
+      const otp = document.getElementById("auth-otp").value.trim();
+      const role = document.getElementById("auth-role").value;
+
+      if (!phone || !otp) return alert("Please enter phone and OTP");
+
+      try {
+        const res = await fetch("/api/auth/verify-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phoneNumber: phone, otp: otp, role: role })
+        });
+
+        if (!res.ok) {
+          throw new Error("Invalid verification code");
+        }
+
+        const data = await res.json();
+        localStorage.setItem("crowdflow_jwt", data.token);
+        localStorage.setItem("crowdflow_role", data.role);
+        localStorage.setItem("crowdflow_phone", data.phoneNumber);
+
+        document.getElementById("auth-status-text").textContent = `${data.role === "ROLE_WARD_OFFICER" ? "Officer" : "Citizen"}: ${data.phoneNumber}`;
+        authModal.style.display = "none";
+        alert(`Signed in successfully as ${data.role} (${data.phoneNumber})`);
+      } catch (e) {
+        alert("Authentication failed: " + e.message);
+      }
+    });
+  }
+
+  // Track Grievance
+  if (btnTrackCode) {
+    btnTrackCode.addEventListener("click", () => trackGrievance());
+  }
+  if (trackCodeInput) {
+    trackCodeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") trackGrievance();
+    });
+  }
+}
+
+async function trackGrievance() {
+  const code = document.getElementById("track-code-input").value.trim();
+  const container = document.getElementById("track-result-container");
+  if (!code) return alert("Please enter a Tracking Code (e.g. IND-H2O-1686)");
+
+  container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Querying Jal Board Grievance Registry...</div>`;
+
+  try {
+    const res = await fetch(`/api/reports/track/${encodeURIComponent(code)}`);
+    if (!res.ok) {
+      container.innerHTML = `
+        <div style="background:#fef2f2; border:1px solid #f87171; border-radius:6px; padding:12px; color:#991b1b; font-size:12px;">
+          <i class="fa-solid fa-circle-exclamation"></i> <strong>Report not found.</strong> Verify your tracking code (e.g., IND-H2O-1686).
+        </div>`;
+      return;
+    }
+
+    const report = await res.json();
+    const isResolved = report.status === "RESOLVED" || report.status === "CLOSED";
+    const statusColor = isResolved ? "#16a34a" : (report.status === "ESCALATED" ? "#dc2626" : "#0284c7");
+
+    let html = `
+      <div style="background:white; border:1px solid var(--border-color); border-radius:8px; padding:14px; box-shadow:0 2px 4px rgba(0,0,0,0.05); margin-top:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span style="font-weight:700; color:var(--primary); font-size:14px;">${report.reportCode}</span>
+          <span class="badge" style="background:${statusColor}; color:white;">${report.statusLabel || report.status}</span>
+        </div>
+
+        <div style="font-size:12px; margin-bottom:8px;">
+          <strong>Issue:</strong> ${report.issueLabel || report.issueType}
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
+          <i class="fa-solid fa-location-dot"></i> ${report.address || "Delhi NCT, India"}
+        </div>
+        <div style="font-size:12px; margin-bottom:8px;">
+          <strong>Jurisdiction:</strong> ${report.municipalBody || "Delhi Jal Board (DJB)"} (Ward ${report.wardNumber || "Central"})
+        </div>
+        <div style="font-size:12px; margin-bottom:10px; color:#334155;">
+          <strong>Description:</strong> ${report.description || "Field report submitted by citizen."}
+        </div>
+
+        ${report.clusterId ? `
+          <div style="background:#eff6ff; border-left:3px solid #3b82f6; padding:8px; border-radius:4px; font-size:11px; margin-bottom:10px;">
+            <i class="fa-solid fa-circle-nodes" style="color:#2563eb;"></i> <strong>Correlated into Cluster #${report.clusterId}</strong><br/>
+            Your complaint has been aggregated with nearby citizen reports for expedited municipal work order dispatch.
+          </div>
+        ` : ''}
+
+        ${report.imageUrl ? `
+          <div style="margin-bottom:10px;">
+            <img src="${report.imageUrl}" alt="Evidence" style="width:100%; max-height:160px; object-fit:cover; border-radius:6px; border:1px solid #e2e8f0;"/>
+          </div>
+        ` : ''}
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+          <span style="font-size:11px; color:var(--text-muted);">Filed: ${report.reportedAt ? new Date(report.reportedAt).toLocaleString('en-IN') : 'Recent'}</span>
+          <button class="btn btn-secondary btn-sm" onclick="zoomToReport(${report.latitude}, ${report.longitude})">
+            <i class="fa-solid fa-crosshairs"></i> View on Map
+          </button>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<div style="color:#dc2626; font-size:12px;">Error tracking grievance: ${err.message}</div>`;
   }
 }
