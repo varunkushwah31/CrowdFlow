@@ -45,6 +45,7 @@ public class LiveTrackingService {
     /**
      * Builds the complete real-time tracking dossier for a citizen's grievance.
      */
+    @org.springframework.cache.annotation.Cacheable(value = "live_tracking", key = "#reportCode", unless = "#result == null || !#result.isPresent()")
     public Optional<LiveGrievanceTrackingDto> getLiveTracking(String reportCode) {
         return reportRepository.findByReportCode(reportCode).map(this::buildTrackingDto);
     }
@@ -78,10 +79,29 @@ public class LiveTrackingService {
         return emitter;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.civic.waterwatch.redis.RedisPubSubService redisPubSubService;
+
+    public void setRedisPubSubService(com.civic.waterwatch.redis.RedisPubSubService redisPubSubService) {
+        this.redisPubSubService = redisPubSubService;
+    }
+
     /**
      * Broadcasts live update event to all connected citizens tracking this report.
+     * Propagates locally to connected SSE emitters and publishes across cluster via Redis Pub/Sub.
      */
+    @org.springframework.cache.annotation.CacheEvict(value = "live_tracking", key = "#reportCode")
     public void notifyReportUpdated(String reportCode) {
+        broadcastLocalSse(reportCode);
+        if (redisPubSubService != null) {
+            redisPubSubService.publishIncidentUpdate(reportCode, null, "REPORT_UPDATED");
+        }
+    }
+
+    /**
+     * Directly pushes SSE update to emitters connected to this JVM instance.
+     */
+    public void broadcastLocalSse(String reportCode) {
         List<SseEmitter> emitters = activeEmitters.get(reportCode);
         if (emitters == null || emitters.isEmpty()) {
             return;
@@ -120,7 +140,7 @@ public class LiveTrackingService {
         WaterReport report = reportRepository.findByReportCode(reportCode)
                 .orElseThrow(() -> new IllegalArgumentException("Grievance not found: " + reportCode));
 
-        report.setCitizenRating(Math.max(1, Math.min(5, rating)));
+        report.setCitizenRating(Math.clamp(rating, 1, 5));
         report.setCitizenFeedbackComment(comments);
         report.setFeedbackSubmittedAt(LocalDateTime.now());
         report = reportRepository.save(report);

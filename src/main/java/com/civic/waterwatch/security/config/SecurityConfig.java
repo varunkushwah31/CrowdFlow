@@ -35,6 +35,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         // Crowdsourced Report Intake & GeoJSON / Heatmap Streaming
                         .requestMatchers("/api/reports", "/api/reports/**").permitAll()
+                        // Redis Cache Management, Geo Proximity & OTP Endpoints
+                        .requestMatchers("/api/cache", "/api/cache/**").permitAll()
                         // Geospatial Clusters, PDF Dossiers & Ward Polygons
                         .requestMatchers("/api/clusters", "/api/clusters/**").permitAll()
                         .requestMatchers("/api/wards", "/api/wards/**").permitAll()

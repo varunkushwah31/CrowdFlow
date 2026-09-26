@@ -42,6 +42,7 @@ public class IncidentClusterController {
 
     @GetMapping("/open")
     @Operation(summary = "List all active, open, and escalated clusters")
+    @org.springframework.cache.annotation.Cacheable(value = "clusters_open", key = "'all'")
     public ResponseEntity<List<IncidentCluster>> getOpenClusters() {
         return ResponseEntity.ok(clusterRepository.findOpenClusters());
     }
@@ -56,6 +57,7 @@ public class IncidentClusterController {
 
     @PostMapping("/run")
     @Operation(summary = "Trigger the spatial DBSCAN clustering algorithm manually across Indian coordinates")
+    @org.springframework.cache.annotation.CacheEvict(value = "clusters_open", allEntries = true)
     public ResponseEntity<SpatialClusteringService.ClusteringRunSummary> triggerClustering(
             @RequestParam(value = "epsMeters", defaultValue = "150.0") double epsMeters,
             @RequestParam(value = "minPoints", defaultValue = "3") int minPoints,

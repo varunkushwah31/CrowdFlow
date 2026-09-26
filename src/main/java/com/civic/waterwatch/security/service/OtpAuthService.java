@@ -18,13 +18,25 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class OtpAuthService {
 
     private final JwtTokenProvider jwtTokenProvider;
 
-    // In-memory OTP cache for phone -> OTP mapping
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.civic.waterwatch.redis.RedisOtpService redisOtpService;
+
+    // In-memory fallback OTP cache if Redis is unavailable
     private final Map<String, String> activeOtps = new ConcurrentHashMap<>();
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OtpAuthService(JwtTokenProvider jwtTokenProvider, @org.springframework.beans.factory.annotation.Autowired(required = false) com.civic.waterwatch.redis.RedisOtpService redisOtpService) {
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.redisOtpService = redisOtpService;
+    }
+
+    public OtpAuthService(JwtTokenProvider jwtTokenProvider) {
+        this(jwtTokenProvider, null);
+    }
 
     @Getter
     @Builder
@@ -38,11 +50,14 @@ public class OtpAuthService {
 
     /**
      * Issues a 6-digit OTP for an Indian mobile number.
-     * In demo/testing mode, default deterministic OTP is '123456' or generated.
+     * Stored in Redis with 5-minute TTL, or in-memory fallback.
      */
     public String generateOtp(String phoneNumber) {
         String cleanPhone = normalizePhoneNumber(phoneNumber);
-        // Generate 6 digit OTP (or '123456' for predictable civic testing)
+        if (redisOtpService != null) {
+            return redisOtpService.generateAndSaveOtp(cleanPhone);
+        }
+        // In-memory fallback
         String otp = String.valueOf((int) ((Math.random() * 900000) + 100000));
         activeOtps.put(cleanPhone, otp);
         log.info("[CIVIC SMS GATEWAY - FAST2SMS/MSG91 SIMULATION] OTP for {}: {}", cleanPhone, otp);
@@ -54,16 +69,22 @@ public class OtpAuthService {
      */
     public AuthResponse verifyOtp(String phoneNumber, String otp, String requestedRole) {
         String cleanPhone = normalizePhoneNumber(phoneNumber);
-        String storedOtp = activeOtps.get(cleanPhone);
 
-        // Accept stored OTP or master demo OTP '123456'
-        boolean valid = "123456".equals(otp) || (storedOtp != null && storedOtp.equals(otp));
+        // Accept master demo OTP '123456' or verify against Redis / in-memory
+        boolean valid = "123456".equals(otp);
+        if (!valid && redisOtpService != null) {
+            valid = redisOtpService.verifyOtp(cleanPhone, otp);
+        } else if (!valid) {
+            String storedOtp = activeOtps.get(cleanPhone);
+            valid = (storedOtp != null && storedOtp.equals(otp));
+            if (valid) {
+                activeOtps.remove(cleanPhone);
+            }
+        }
 
         if (!valid) {
             throw new IllegalArgumentException("Invalid OTP provided for phone: " + phoneNumber);
         }
-
-        activeOtps.remove(cleanPhone);
 
         UserRole role = UserRole.ROLE_CITIZEN;
         if ("WARD_OFFICER".equalsIgnoreCase(requestedRole) || cleanPhone.contains("98110") || cleanPhone.contains("98711")) {

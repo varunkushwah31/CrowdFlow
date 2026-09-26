@@ -45,7 +45,7 @@ public class MediaStorageController {
             } else {
                 return ResponseEntity.notFound().build();
             }
-        } catch (Exception e) {
+        } catch (Exception _) {
             return ResponseEntity.internalServerError().build();
         }
     }

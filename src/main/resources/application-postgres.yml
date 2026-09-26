@@ -22,6 +22,26 @@ spring:
           lob:
             non_contextual_creation: true
 
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 1000ms
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000ms
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: "crowdflow:cache:"
+
 waterwatch:
   clustering:
     use-native-postgis: true

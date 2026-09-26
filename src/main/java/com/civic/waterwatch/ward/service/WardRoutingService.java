@@ -74,10 +74,12 @@ public class WardRoutingService {
         }
     }
 
+    @org.springframework.cache.annotation.Cacheable(value = "wards", key = "'all'")
     public List<MunicipalWard> getAllWards() {
         return wardRepository.findAll();
     }
 
+    @org.springframework.cache.annotation.Cacheable(value = "wards", key = "#wardNumber")
     public Optional<MunicipalWard> findWardByNumber(Integer wardNumber) {
         return wardRepository.findByWardNumber(wardNumber);
     }

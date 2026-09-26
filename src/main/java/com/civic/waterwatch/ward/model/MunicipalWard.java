@@ -3,6 +3,8 @@ package com.civic.waterwatch.ward.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.io.Serial;
+
 @Entity
 @Table(name = "municipal_wards")
 @Getter
@@ -11,7 +13,10 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @ToString
-public class MunicipalWard {
+public class MunicipalWard implements java.io.Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -27,6 +27,7 @@ public class IncidentReportController {
     private final IncidentReportService reportService;
     private final ExifParserService exifParserService;
     private final com.civic.waterwatch.incident.service.LiveTrackingService liveTrackingService;
+    private final com.civic.waterwatch.redis.RedisRateLimiterService rateLimiterService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Submit a water issue report with media upload and automated camera EXIF extraction")
@@ -40,6 +41,11 @@ public class IncidentReportController {
             @RequestParam(value = "citizenEmail", required = false) String citizenEmail,
             @RequestPart(value = "file", required = false) MultipartFile file
     ) {
+        String clientKey = (citizenPhone != null && !citizenPhone.isBlank()) ? citizenPhone : "anonymous-client";
+        if (rateLimiterService != null && !rateLimiterService.isAllowed(clientKey, 30, 60)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
+
         WaterReportRequestDto dto = WaterReportRequestDto.builder()
                 .issueType(issueType)
                 .description(description)
@@ -57,6 +63,12 @@ public class IncidentReportController {
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Submit a water issue report via raw JSON payload")
     public ResponseEntity<WaterReportResponseDto> submitReportJson(@RequestBody WaterReportRequestDto dto) {
+        String clientKey = (dto != null && dto.getCitizenPhone() != null && !dto.getCitizenPhone().isBlank())
+                ? dto.getCitizenPhone() : "anonymous-client";
+        if (rateLimiterService != null && !rateLimiterService.isAllowed(clientKey, 30, 60)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
+
         WaterReportResponseDto created = reportService.submitReport(dto, null);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }

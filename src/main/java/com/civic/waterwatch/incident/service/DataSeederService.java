@@ -21,6 +21,7 @@ public class DataSeederService {
     private final WaterReportRepository reportRepository;
     private final SpatialClusteringService clusteringService;
     private final ReverseGeocodingService reverseGeocodingService;
+    private final com.civic.waterwatch.redis.RedisGeoSpatialService redisGeoSpatialService;
 
     @PostConstruct
     public void seedInitialDemoData() {
@@ -98,6 +99,9 @@ public class DataSeederService {
             report.setWardName(addr.getWardName());
 
             reportRepository.save(report);
+            if (redisGeoSpatialService != null && report.getLatitude() != null && report.getLongitude() != null) {
+                redisGeoSpatialService.indexReportLocation(report.getReportCode(), report.getLatitude(), report.getLongitude());
+            }
         }
 
         log.info("Seeded {} Indian water reports. Running initial DBSCAN clustering...", seeds.size());

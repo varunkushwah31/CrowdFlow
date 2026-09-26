@@ -33,6 +33,7 @@ public class IncidentReportService {
     private final ReverseGeocodingService reverseGeocodingService;
     private final ImageOptimizationService imageOptimizationService;
     private final com.civic.waterwatch.storage.ObjectStorageService objectStorageService;
+    private final com.civic.waterwatch.redis.RedisGeoSpatialService redisGeoSpatialService;
 
     @Value("${waterwatch.storage.upload-dir:./uploads}")
     private String uploadDir;
@@ -44,6 +45,7 @@ public class IncidentReportService {
     private double defaultLon;
 
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(value = "heatmap", allEntries = true)
     public WaterReportResponseDto submitReport(WaterReportRequestDto dto, MultipartFile file) {
         WaterReport report = new WaterReport();
         report.setReportCode("IND-H2O-" + (1000 + (long) (Math.random() * 9000)));
@@ -121,6 +123,10 @@ public class IncidentReportService {
         log.info("Persisted new Indian civic report: {} at [{}, {}] in {}",
                 report.getReportCode(), report.getLatitude(), report.getLongitude(), report.getWardName());
 
+        if (redisGeoSpatialService != null && report.getLatitude() != null && report.getLongitude() != null) {
+            redisGeoSpatialService.indexReportLocation(report.getReportCode(), report.getLatitude(), report.getLongitude());
+        }
+
         return WaterReportResponseDto.fromEntity(report);
     }
 
@@ -172,6 +178,7 @@ public class IncidentReportService {
         return featureCollection;
     }
 
+    @org.springframework.cache.annotation.Cacheable(value = "heatmap", key = "'points'")
     public List<List<Double>> getHeatmapPoints() {
         List<WaterReport> reports = reportRepository.findAll();
         List<List<Double>> points = new ArrayList<>();

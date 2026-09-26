@@ -3,6 +3,7 @@ package com.civic.waterwatch.clustering.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.io.Serial;
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,7 +18,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @ToString
-public class IncidentCluster {
+public class IncidentCluster implements java.io.Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

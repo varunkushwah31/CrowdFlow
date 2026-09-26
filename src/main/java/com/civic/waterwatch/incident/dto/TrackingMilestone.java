@@ -5,13 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
 import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TrackingMilestone {
+public class TrackingMilestone implements java.io.Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
     private String stepKey;       // SUBMITTED, TRIAGED, CLUSTERED, DISPATCHED, RESOLVED
     private String title;         // Display title (e.g. "Report Received & GPS Verified")
     private String description;   // Detailed milestone text
