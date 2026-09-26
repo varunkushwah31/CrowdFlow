@@ -74,7 +74,7 @@
 ### Layer 4: Asynchronous Processing & Clustering Execution
 - **Task Execution**: Spring Task Execution backed by Java 25 Virtual Threads for decoupled intake.
 - **Scheduling**: `@Scheduled` cluster evaluation running every 2 minutes across Indian municipal wards.
-- **Clustering Algorithms**: Geodesic Haversine DBSCAN algorithm ($\varepsilon = 150\text{m}$, $\text{MinPts} = 3$) with root-cause correlation engine (Feeder Burst, Sewage Ingress, Pumping Station Trip, Storm Sump Choke).
+- **Clustering Algorithms**: Geodesic Haversine DBSCAN algorithm ($\EPSILON = 150\text{m}$, $\text{MinPts} = 3$) with root-cause correlation engine (Feeder Burst, Sewage Ingress, Pumping Station Trip, Storm Sump Choke).
 
 ### Layer 5: GIS, Reverse Geocoding & Mapping Services
 - **Base Tiles & Heatmap**: OpenStreetMap and Leaflet.js with `Leaflet.heat` for dynamic thermal hotspot rendering.
@@ -98,21 +98,21 @@
 
 ## 📡 REST API Reference
 
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `POST` | `/api/auth/send-otp` | Public | Send 6-digit OTP to Indian phone (`+91`) |
-| `POST` | `/api/auth/verify-otp` | Public | Verify OTP & obtain JWT Bearer Token |
-| `POST` | `/api/reports` | Public / Citizen | Submit incident with multipart media & EXIF extraction |
-| `POST` | `/api/reports/extract-exif` | Public | Preview EXIF GPS coordinates from photo |
-| `GET` | `/api/reports` | Public | List all Indian water incident reports |
-| `GET` | `/api/reports/geojson` | Public | Stream GeoJSON FeatureCollection for vector maps |
-| `GET` | `/api/reports/heatmap` | Public | Retrieve weighted points for thermal heatmap |
-| `POST` | `/api/clusters/trigger-clustering` | Public / Officer | Trigger on-demand DBSCAN clustering run |
-| `GET` | `/api/clusters` | Public | List active emergency incident clusters |
-| `GET` | `/api/clusters/{id}/pdf-report` | Public / Officer | Download official DJB municipal escalation PDF dossier |
-| `GET` | `/api/wards` | Public | List Delhi municipal wards and nodal officers |
-| `GET` | `/api/municipal/dispatch-logs` | Public / Officer | View dispatch logs and citizen notifications |
-| `GET` | `/actuator/prometheus` | Public / Admin | Scrape Prometheus operational metrics |
+| Method | Endpoint                           | Access           | Description                                            |
+|--------|------------------------------------|------------------|--------------------------------------------------------|
+| `POST` | `/api/auth/send-otp`               | Public           | Send 6-digit OTP to Indian phone (`+91`)               |
+| `POST` | `/api/auth/verify-otp`             | Public           | Verify OTP & obtain JWT Bearer Token                   |
+| `POST` | `/api/reports`                     | Public / Citizen | Submit incident with multipart media & EXIF extraction |
+| `POST` | `/api/reports/extract-exif`        | Public           | Preview EXIF GPS coordinates from photo                |
+| `GET`  | `/api/reports`                     | Public           | List all Indian water incident reports                 |
+| `GET`  | `/api/reports/geojson`             | Public           | Stream GeoJSON FeatureCollection for vector maps       |
+| `GET`  | `/api/reports/heatmap`             | Public           | Retrieve weighted points for thermal heatmap           |
+| `POST` | `/api/clusters/trigger-clustering` | Public / Officer | Trigger on-demand DBSCAN clustering run                |
+| `GET`  | `/api/clusters`                    | Public           | List active emergency incident clusters                |
+| `GET`  | `/api/clusters/{id}/pdf-report`    | Public / Officer | Download official DJB municipal escalation PDF dossier |
+| `GET`  | `/api/wards`                       | Public           | List Delhi municipal wards and nodal officers          |
+| `GET`  | `/api/municipal/dispatch-logs`     | Public / Officer | View dispatch logs and citizen notifications           |
+| `GET`  | `/actuator/prometheus`             | Public / Admin   | Scrape Prometheus operational metrics                  |
 
 ---
 
@@ -142,6 +142,3 @@ This spins up:
 - **MinIO S3 Console**: [http://localhost:9001](http://localhost:9001) (`minioadmin` / `minioadmin`)
 
 ---
-
-## 📄 License
-Open-source under the [MIT License](LICENSE).
