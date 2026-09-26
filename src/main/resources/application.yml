@@ -95,6 +95,9 @@ management:
       show-details: always
     prometheus:
       enabled: true
+  health:
+    mail:
+      enabled: false
 
 springdoc:
   api-docs:
