@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.repository.CrudRepository;
 
 /**
  * Exposes production Prometheus metrics for municipal dashboards & Grafana.
@@ -41,7 +42,7 @@ public class MetricsConfig {
                 .register(meterRegistry);
 
         Gauge.builder("crowdflow_clusters_active_total", clusterRepository,
-                repo -> repo.count())
+                        CrudRepository::count)
                 .description("Total detected water infrastructure emergency clusters")
                 .register(meterRegistry);
     }

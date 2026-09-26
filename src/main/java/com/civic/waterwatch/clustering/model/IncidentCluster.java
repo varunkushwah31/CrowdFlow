@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @ToString
 public class IncidentCluster {
 
@@ -69,6 +70,9 @@ public class IncidentCluster {
 
     @Column(name = "technical_analysis", length = 2000)
     private String technicalAnalysis;
+
+    @Column(name = "status_notes", length = 1000)
+    private String statusNotes;
 
     @Column(name = "confidence_score")
     private Double confidenceScore;

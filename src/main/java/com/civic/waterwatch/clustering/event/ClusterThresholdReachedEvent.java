@@ -1,8 +1,10 @@
 package com.civic.waterwatch.clustering.event;
 
 import com.civic.waterwatch.clustering.model.IncidentCluster;
+import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
+@Getter
 public class ClusterThresholdReachedEvent extends ApplicationEvent {
 
     private final IncidentCluster cluster;
@@ -14,11 +16,4 @@ public class ClusterThresholdReachedEvent extends ApplicationEvent {
         this.triggerReason = triggerReason;
     }
 
-    public IncidentCluster getCluster() {
-        return cluster;
-    }
-
-    public String getTriggerReason() {
-        return triggerReason;
-    }
 }

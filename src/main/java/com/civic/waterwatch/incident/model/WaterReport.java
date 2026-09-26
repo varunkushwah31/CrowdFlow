@@ -103,6 +103,15 @@ public class WaterReport {
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
 
+    @Column(name = "citizen_rating")
+    private Integer citizenRating;
+
+    @Column(name = "citizen_feedback_comment", length = 500)
+    private String citizenFeedbackComment;
+
+    @Column(name = "feedback_submitted_at")
+    private LocalDateTime feedbackSubmittedAt;
+
     @PrePersist
     public void onPrePersist() {
         if (this.reportedAt == null) {

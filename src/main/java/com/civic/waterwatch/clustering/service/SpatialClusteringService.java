@@ -169,8 +169,8 @@ public class SpatialClusteringService {
 
         double sumLat = 0.0;
         double sumLon = 0.0;
-        LocalDateTime earliest = points.get(0).getReportedAt();
-        LocalDateTime latest = points.get(0).getReportedAt();
+        LocalDateTime earliest = points.getFirst().getReportedAt();
+        LocalDateTime latest = points.getFirst().getReportedAt();
 
         for (WaterReport r : points) {
             sumLat += r.getLatitude();

@@ -234,15 +234,20 @@ function initEventListeners() {
       });
       if (res.ok) {
         const created = await res.json();
-        alert(`Citizen Grievance Registered!\nReference Code: ${created.reportCode}\nAssigned Ward: ${created.wardName}\nAuthority: ${created.municipalBody || 'Delhi Jal Board'}`);
         document.getElementById("incident-report-form").reset();
         document.getElementById("exif-preview").style.display = "none";
         if (tempClickMarker) map.removeLayer(tempClickMarker);
 
         await loadAllData();
 
-        document.querySelector('.nav-tab-btn[data-tab="tab-map"]').click();
-        map.flyTo([created.latitude, created.longitude], 16);
+        // Switch citizen directly to live tracking view
+        const trackTabBtn = document.querySelector('.nav-tab-btn[data-tab="tab-track"]');
+        if (trackTabBtn) trackTabBtn.click();
+        document.getElementById("track-code-input").value = created.reportCode;
+        trackGrievance(created.reportCode);
+        if (created.latitude && created.longitude) {
+          map.flyTo([created.latitude, created.longitude], 16);
+        }
       } else {
         alert("Failed to submit grievance. Please verify parameters.");
       }
@@ -805,14 +810,26 @@ function initAuthAndTracking() {
   }
 }
 
-async function trackGrievance() {
-  const code = document.getElementById("track-code-input").value.trim();
+let activeEventSource = null;
+
+async function trackGrievance(explicitCode) {
+  const code = explicitCode || document.getElementById("track-code-input").value.trim();
   const container = document.getElementById("track-result-container");
   if (!code) return alert("Please enter a Tracking Code (e.g. IND-H2O-1686)");
 
-  container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Querying Jal Board Grievance Registry...</div>`;
+  if (activeEventSource) {
+    activeEventSource.close();
+    activeEventSource = null;
+  }
+
+  container.innerHTML = `
+    <div style="text-align:center; padding:24px; color:var(--text-muted);">
+      <i class="fa-solid fa-satellite-dish fa-spin" style="font-size:24px; color:var(--primary); margin-bottom:8px;"></i>
+      <div>Connecting to Delhi Jal Board Real-Time Field Stream...</div>
+    </div>`;
 
   try {
+    // 1. Initial snapshot fetch
     const res = await fetch(`/api/reports/track/${encodeURIComponent(code)}`);
     if (!res.ok) {
       container.innerHTML = `
@@ -822,54 +839,225 @@ async function trackGrievance() {
       return;
     }
 
-    const report = await res.json();
-    const isResolved = report.status === "RESOLVED" || report.status === "CLOSED";
-    const statusColor = isResolved ? "#16a34a" : (report.status === "ESCALATED" ? "#dc2626" : "#0284c7");
+    const initialData = await res.json();
+    renderLiveTrackingCard(initialData);
 
-    let html = `
-      <div style="background:white; border:1px solid var(--border-color); border-radius:8px; padding:14px; box-shadow:0 2px 4px rgba(0,0,0,0.05); margin-top:8px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <span style="font-weight:700; color:var(--primary); font-size:14px;">${report.reportCode}</span>
-          <span class="badge" style="background:${statusColor}; color:white;">${report.statusLabel || report.status}</span>
-        </div>
+    // Center map on incident
+    if (initialData.latitude && initialData.longitude) {
+      map.flyTo([initialData.latitude, initialData.longitude], 15, { animate: true });
+    }
 
-        <div style="font-size:12px; margin-bottom:8px;">
-          <strong>Issue:</strong> ${report.issueLabel || report.issueType}
-        </div>
-        <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
-          <i class="fa-solid fa-location-dot"></i> ${report.address || "Delhi NCT, India"}
-        </div>
-        <div style="font-size:12px; margin-bottom:8px;">
-          <strong>Jurisdiction:</strong> ${report.municipalBody || "Delhi Jal Board (DJB)"} (Ward ${report.wardNumber || "Central"})
-        </div>
-        <div style="font-size:12px; margin-bottom:10px; color:#334155;">
-          <strong>Description:</strong> ${report.description || "Field report submitted by citizen."}
-        </div>
+    // 2. Establish live SSE stream
+    activeEventSource = new EventSource(`/api/reports/track/${encodeURIComponent(code)}/live-stream`);
 
-        ${report.clusterId ? `
-          <div style="background:#eff6ff; border-left:3px solid #3b82f6; padding:8px; border-radius:4px; font-size:11px; margin-bottom:10px;">
-            <i class="fa-solid fa-circle-nodes" style="color:#2563eb;"></i> <strong>Correlated into Cluster #${report.clusterId}</strong><br/>
-            Your complaint has been aggregated with nearby citizen reports for expedited municipal work order dispatch.
-          </div>
-        ` : ''}
+    activeEventSource.addEventListener("grievance-status", (event) => {
+      try {
+        const liveData = JSON.parse(event.data);
+        renderLiveTrackingCard(liveData);
+      } catch (err) {
+        console.error("Error parsing live SSE event:", err);
+      }
+    });
 
-        ${report.imageUrl ? `
-          <div style="margin-bottom:10px;">
-            <img src="${report.imageUrl}" alt="Evidence" style="width:100%; max-height:160px; object-fit:cover; border-radius:6px; border:1px solid #e2e8f0;"/>
-          </div>
-        ` : ''}
+    activeEventSource.onerror = (err) => {
+      console.warn("SSE connection error/reconnecting:", err);
+    };
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-          <span style="font-size:11px; color:var(--text-muted);">Filed: ${report.reportedAt ? new Date(report.reportedAt).toLocaleString('en-IN') : 'Recent'}</span>
-          <button class="btn btn-secondary btn-sm" onclick="zoomToReport(${report.latitude}, ${report.longitude})">
-            <i class="fa-solid fa-crosshairs"></i> View on Map
-          </button>
-        </div>
-      </div>
-    `;
-
-    container.innerHTML = html;
   } catch (err) {
-    container.innerHTML = `<div style="color:#dc2626; font-size:12px;">Error tracking grievance: ${err.message}</div>`;
+    container.innerHTML = `<div style="color:#dc2626; font-size:12px;">Error connecting to live tracking stream: ${err.message}</div>`;
   }
 }
+
+function renderLiveTrackingCard(data) {
+  const container = document.getElementById("track-result-container");
+  const isResolved = data.currentStage === "RESOLVED" || data.currentStage === "CLOSED";
+  const statusColor = isResolved ? "#10b981" : (data.currentStage === "DISPATCHED" ? "#f59e0b" : "#0284c7");
+
+  // Build Milestones Stepper HTML
+  let milestonesHtml = "";
+  if (data.milestones && data.milestones.length > 0) {
+    milestonesHtml = data.milestones.map((m) => {
+      const isDone = m.status === "COMPLETED";
+      const isCurrent = m.status === "CURRENT";
+      const stepClass = isDone ? "completed" : (isCurrent ? "current" : "");
+
+      return `
+        <div class="stepper-step ${stepClass}">
+          <div class="stepper-step-icon">
+            <i class="fa-solid ${m.icon || (isDone ? 'fa-check' : 'fa-circle')}"></i>
+          </div>
+          <div class="stepper-step-body">
+            <div class="stepper-step-title">${m.title}</div>
+            <div class="stepper-step-desc">${m.description}</div>
+            <div class="stepper-step-meta">
+              <span><i class="fa-solid fa-user-gear"></i> ${m.actor || 'Municipal System'}</span>
+              <span>${m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}) : (isDone ? 'Done' : (isCurrent ? 'In Progress' : 'Pending'))}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  let html = `
+    <div style="background:white; border:1px solid var(--border-color); border-radius:10px; padding:16px; box-shadow:0 4px 6px rgba(0,0,0,0.05); margin-top:8px;">
+
+      <!-- Header: Code, Stage & Live Pulse -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:800; color:var(--primary); font-size:16px;">${data.reportCode}</span>
+            <span class="live-pulse-badge">
+              <span class="live-pulse-dot"></span> LIVE FIELD STREAM
+            </span>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+            ${data.issueTypeName || data.issueType} &bull; ${data.neighborhood || data.address || 'Delhi NCT'}
+          </div>
+        </div>
+        <span class="badge" style="background:${statusColor}; color:white; padding:4px 10px; font-size:11px;">
+          ${data.currentStage}
+        </span>
+      </div>
+
+      <!-- Animated Progress Track -->
+      <div style="margin: 10px 0;">
+        <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">
+          <span>Resolution Progress</span>
+          <span>${data.progressPercentage}% Completed</span>
+        </div>
+        <div class="progress-track-wrapper">
+          <div class="progress-track-bar" style="width: ${data.progressPercentage}%;"></div>
+        </div>
+        <div style="font-size:11px; color:#475569; background:#f8fafc; padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary);">
+          <strong>Current Stage:</strong> ${data.statusDescription}
+        </div>
+      </div>
+
+      <!-- Nodal Engineering Jurisdiction Box -->
+      <div style="background:#f1f5f9; border-radius:8px; padding:10px 12px; margin: 12px 0; font-size:12px;">
+        <div style="font-weight:700; color:#1e293b; margin-bottom:6px; display:flex; justify-content:space-between;">
+          <span><i class="fa-solid fa-building-flag" style="color:var(--primary);"></i> ${data.municipalBody || 'Delhi Jal Board'}</span>
+          <span style="color:#0284c7; font-weight:700;">Ward ${data.wardNumber || 'Central'}</span>
+        </div>
+        <div style="color:#475569; margin-bottom:4px;">
+          <strong>Executive Engineer:</strong> ${data.officerName || 'Shri Alok Sharma'} (${data.officerRole || 'EE Water'})
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:11px;">
+          <a href="tel:${data.officerContact || '+919811023412'}" style="color:#0284c7; text-decoration:none; font-weight:600;">
+            <i class="fa-solid fa-phone"></i> ${data.officerContact || '+91 98110 23412'}
+          </a>
+          <span style="color:#059669; font-weight:600;"><i class="fa-solid fa-clock"></i> ETA: ${data.estimatedResolutionTime || 'Within 4 Hours'}</span>
+        </div>
+      </div>
+
+      <!-- Associated Cluster Hotspot Card (if clustered) -->
+      ${data.clusterCode ? `
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 12px; margin:10px 0; font-size:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:700; color:#1e40af;"><i class="fa-solid fa-circle-nodes"></i> Hotspot: ${data.clusterCode}</span>
+            <span class="badge badge-critical" style="font-size:10px;">${data.clusterSeverity} SEVERITY</span>
+          </div>
+          <div style="color:#1e3a8a; font-size:11px; margin-bottom:4px;">
+            <strong>Root Cause Diagnosis:</strong> ${data.rootCauseSummary || 'Pipeline Hydraulic Stress & Arterial Rupture'}
+          </div>
+          <div style="font-size:11px; color:#3b82f6; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fa-solid fa-users"></i> ${data.neighborReportCount} Citizen Complaints Correlated</span>
+            ${data.pdfDossierUrl ? `<a href="${data.pdfDossierUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px; padding:2px 6px;"><i class="fa-solid fa-file-pdf"></i> View Dossier</a>` : ''}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Real-Time Field Notes -->
+      ${data.latestFieldNotes ? `
+        <div style="background:#fefce8; border:1px solid #fef08a; border-radius:6px; padding:8px 10px; margin:10px 0; font-size:11px; color:#854d0e;">
+          <i class="fa-solid fa-bullhorn"></i> <strong>Field Inspection Note:</strong> ${data.latestFieldNotes}
+        </div>
+      ` : ''}
+
+      <!-- 5-Stage Live Milestone Stepper -->
+      <div style="margin-top:14px;">
+        <div style="font-size:12px; font-weight:700; color:#1e293b; margin-bottom:6px;">Resolution Milestones</div>
+        <div class="stepper-timeline">
+          ${milestonesHtml}
+        </div>
+      </div>
+
+      <!-- Citizen Satisfaction Feedback Form (Active when Resolved) -->
+      ${isResolved ? `
+        <div class="star-rating-box">
+          <div style="font-weight:700; font-size:12px; color:#1e293b; margin-bottom:4px;">
+            <i class="fa-solid fa-star" style="color:#f59e0b;"></i> Citizen Satisfaction Feedback
+          </div>
+          <p style="font-size:11px; color:#64748b; margin-bottom:8px;">
+            Delhi Jal Board has marked this issue as resolved. Please rate the speed and quality of field restoration:
+          </p>
+          <div style="display:flex; gap:6px; margin-bottom:8px;" id="star-rating-buttons">
+            ${[1, 2, 3, 4, 5].map(star => `
+              <button type="button" class="star-btn ${data.citizenRating && star <= data.citizenRating ? 'active' : ''}" onclick="selectStarRating('${data.reportCode}', ${star})">
+                <i class="fa-solid fa-star"></i>
+              </button>
+            `).join("")}
+          </div>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="feedback-comment-input" class="form-input" style="font-size:11px;" placeholder="Optional feedback (e.g. pressure restored, clean water)..." value="${data.citizenFeedbackComment || ''}"/>
+            <button class="btn btn-primary btn-sm" onclick="submitCitizenFeedback('${data.reportCode}')">
+              Submit
+            </button>
+          </div>
+          ${data.citizenRating ? `
+            <div style="color:#059669; font-size:11px; font-weight:600; margin-top:6px;">
+              <i class="fa-solid fa-circle-check"></i> Thank you! Your ${data.citizenRating}-star feedback was recorded by Delhi Jal Board.
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      <!-- Footer Actions -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; border-top:1px solid #f1f5f9; padding-top:10px;">
+        <span style="font-size:10px; color:#94a3b8;">
+          Reported: ${data.reportedAt ? new Date(data.reportedAt).toLocaleString('en-IN') : 'Just now'}
+        </span>
+        <button class="btn btn-secondary btn-sm" onclick="zoomToReport(${data.latitude}, ${data.longitude})">
+          <i class="fa-solid fa-crosshairs"></i> Center on Map
+        </button>
+      </div>
+
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+let selectedRatingValue = 5;
+
+window.selectStarRating = function(reportCode, star) {
+  selectedRatingValue = star;
+  const buttons = document.querySelectorAll("#star-rating-buttons .star-btn");
+  buttons.forEach((btn, idx) => {
+    if (idx < star) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+};
+
+window.submitCitizenFeedback = async function(reportCode) {
+  const comment = document.getElementById("feedback-comment-input")?.value || "";
+  try {
+    const res = await fetch(`/api/reports/track/${encodeURIComponent(reportCode)}/feedback?rating=${selectedRatingValue}&comment=${encodeURIComponent(comment)}`, {
+      method: "POST"
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      renderLiveTrackingCard(updated);
+      alert("Your feedback has been submitted to Delhi Jal Board!");
+    } else {
+      alert("Failed to submit feedback.");
+    }
+  } catch (err) {
+    alert("Feedback error: " + err.message);
+  }
+};
+

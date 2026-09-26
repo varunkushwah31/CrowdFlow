@@ -102,6 +102,6 @@ public class WardRoutingService {
         // 2. Fallback: Closest ward centroid
         return wards.stream()
                 .min(Comparator.comparingDouble(w -> w.distanceToCenter(lat, lon)))
-                .orElse(wards.get(0));
+                .orElse(wards.getFirst());
     }
 }

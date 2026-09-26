@@ -32,6 +32,7 @@ public class IncidentClusterController {
     private final PdfReportService pdfReportService;
     private final MunicipalDispatchService dispatchService;
     private final CitizenNotificationService citizenNotificationService;
+    private final com.civic.waterwatch.incident.service.LiveTrackingService liveTrackingService;
 
     @GetMapping
     @Operation(summary = "List all Indian civic incident clusters")
@@ -89,6 +90,7 @@ public class IncidentClusterController {
         cluster = clusterRepository.save(cluster);
 
         dispatchService.dispatchEscalation(cluster);
+        liveTrackingService.notifyClusterUpdated(id);
 
         return ResponseEntity.ok(Map.of(
                 "status", "SUCCESS",
@@ -112,12 +114,16 @@ public class IncidentClusterController {
         if (statusStr != null) {
             ClusterStatus newStatus = ClusterStatus.valueOf(statusStr.toUpperCase());
             cluster.setStatus(newStatus);
+            if (notes != null && !notes.isBlank()) {
+                cluster.setStatusNotes(notes);
+            }
             if (newStatus == ClusterStatus.RESOLVED || newStatus == ClusterStatus.CLOSED) {
                 cluster.setResolvedAt(LocalDateTime.now());
             }
             cluster = clusterRepository.save(cluster);
 
             citizenNotificationService.notifyCitizensOfStatusChange(cluster, newStatus, notes);
+            liveTrackingService.notifyClusterUpdated(id);
         }
 
         return ResponseEntity.ok(cluster);

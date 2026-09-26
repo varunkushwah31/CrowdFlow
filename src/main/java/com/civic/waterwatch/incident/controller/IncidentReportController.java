@@ -26,6 +26,7 @@ public class IncidentReportController {
 
     private final IncidentReportService reportService;
     private final ExifParserService exifParserService;
+    private final com.civic.waterwatch.incident.service.LiveTrackingService liveTrackingService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Submit a water issue report with media upload and automated camera EXIF extraction")
@@ -92,10 +93,28 @@ public class IncidentReportController {
     }
 
     @GetMapping("/track/{reportCode}")
-    @Operation(summary = "Track citizen water grievance by unique report tracking code (e.g. IND-H2O-1686)")
-    public ResponseEntity<WaterReportResponseDto> trackReport(@PathVariable String reportCode) {
-        return reportService.getReportByCode(reportCode)
+    @Operation(summary = "Track citizen water grievance live by unique tracking code (e.g. IND-H2O-1686)")
+    public ResponseEntity<com.civic.waterwatch.incident.dto.LiveGrievanceTrackingDto> trackReport(@PathVariable String reportCode) {
+        return liveTrackingService.getLiveTracking(reportCode)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping(value = "/track/{reportCode}/live-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Subscribe to real-time Server-Sent Events (SSE) for live field progress updates")
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter streamLiveTracking(@PathVariable String reportCode) {
+        return liveTrackingService.subscribeLiveUpdates(reportCode);
+    }
+
+    @PostMapping("/track/{reportCode}/feedback")
+    @Operation(summary = "Submit citizen satisfaction rating (1-5 stars) and field comments once grievance is resolved")
+    public ResponseEntity<com.civic.waterwatch.incident.dto.LiveGrievanceTrackingDto> submitFeedback(
+            @PathVariable String reportCode,
+            @RequestParam("rating") int rating,
+            @RequestParam(value = "comment", required = false) String comment
+    ) {
+        com.civic.waterwatch.incident.dto.LiveGrievanceTrackingDto updated =
+                liveTrackingService.submitCitizenFeedback(reportCode, rating, comment);
+        return ResponseEntity.ok(updated);
     }
 }
