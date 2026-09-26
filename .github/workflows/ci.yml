@@ -11,6 +11,17 @@ jobs:
     name: Build & Verify (Java 25 & Spring Boot 3.4)
     runs-on: ubuntu-latest
 
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6382:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

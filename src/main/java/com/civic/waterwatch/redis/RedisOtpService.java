@@ -35,9 +35,12 @@ public class RedisOtpService {
         String otp = String.valueOf(code);
 
         String redisKey = OTP_PREFIX + normalizedPhone;
-        stringRedisTemplate.opsForValue().set(redisKey, otp, Duration.ofSeconds(OTP_TTL_SECONDS));
-
-        log.info("Generated 6-digit OTP for citizen phone {}: [TTL: {}s]", normalizedPhone, OTP_TTL_SECONDS);
+        try {
+            stringRedisTemplate.opsForValue().set(redisKey, otp, Duration.ofSeconds(OTP_TTL_SECONDS));
+            log.info("Generated 6-digit OTP for citizen phone {}: [TTL: {}s]", normalizedPhone, OTP_TTL_SECONDS);
+        } catch (Exception e) {
+            log.warn("Failed to store OTP in Redis for phone {}: {}", normalizedPhone, e.getMessage());
+        }
         return otp;
     }
 
@@ -52,12 +55,16 @@ public class RedisOtpService {
         String normalizedPhone = normalizePhone(phoneNumber);
         String redisKey = OTP_PREFIX + normalizedPhone;
 
-        String storedOtp = stringRedisTemplate.opsForValue().get(redisKey);
-        if (storedOtp != null && storedOtp.equals(inputOtp.trim())) {
-            // Delete upon successful verification to avoid replay
-            stringRedisTemplate.delete(redisKey);
-            log.info("Citizen OTP verification SUCCEEDED for phone {}", normalizedPhone);
-            return true;
+        try {
+            String storedOtp = stringRedisTemplate.opsForValue().get(redisKey);
+            if (storedOtp != null && storedOtp.equals(inputOtp.trim())) {
+                // Delete upon successful verification to avoid replay
+                stringRedisTemplate.delete(redisKey);
+                log.info("Citizen OTP verification SUCCEEDED for phone {}", normalizedPhone);
+                return true;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to verify OTP against Redis for phone {}: {}", normalizedPhone, e.getMessage());
         }
 
         log.warn("Citizen OTP verification FAILED for phone {}", normalizedPhone);
@@ -68,15 +75,23 @@ public class RedisOtpService {
      * Manually invalidates any pending OTP for the given phone number.
      */
     public void revokeOtp(String phoneNumber) {
-        stringRedisTemplate.delete(OTP_PREFIX + normalizePhone(phoneNumber));
+        try {
+            stringRedisTemplate.delete(OTP_PREFIX + normalizePhone(phoneNumber));
+        } catch (Exception e) {
+            log.warn("Failed to revoke OTP in Redis: {}", e.getMessage());
+        }
     }
 
     /**
      * Returns remaining TTL of an OTP in seconds.
      */
     public long getOtpTtlSeconds(String phoneNumber) {
-        Long ttl = stringRedisTemplate.getExpire(OTP_PREFIX + normalizePhone(phoneNumber));
-        return ttl != null && ttl > 0 ? ttl : 0;
+        try {
+            Long ttl = stringRedisTemplate.getExpire(OTP_PREFIX + normalizePhone(phoneNumber));
+            return ttl != null && ttl > 0 ? ttl : 0;
+        } catch (Exception _) {
+            return 0;
+        }
     }
 
     private String normalizePhone(String phone) {
