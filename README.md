@@ -1,168 +1,147 @@
-# 🌊 CrowdFlow - Community Water Issue Crowdsourcing Platform
+# 🌊 CrowdFlow - Production-Grade Community Water Monitoring Platform
 
-> **Civic-Tech Municipal Water Infrastructure Crowdsourcing, Geospatial Clustering & Automated Escalation Platform**  
-> *Tailored specifically for Indian Municipal Governance (Delhi Jal Board - DJB, Municipal Corporation of Delhi - MCD, NDMC, and Jal Jeevan Mission / AMRUT 2.0).*
-
----
-
-## 📌 Overview
-
-**CrowdFlow** bridges the critical gap between citizens experiencing water crises and municipal engineering departments. By leveraging crowdsourced incident reports, automated EXIF metadata parsing, geodesic spatial clustering, root-cause correlation diagnostics, and automated municipal PDF dossier generation, CrowdFlow accelerates incident response from days to minutes.
+> **Enterprise Civic-Tech Municipal Water Infrastructure Crowdsourcing, Spatial Clustering & Automated Escalation Platform**  
+> *Anchored by Java 25 (Project Loom / Virtual Threads), Spring Boot 3.4 Monolith, PostGIS 16, Redis 7, MinIO S3, Nginx Reverse Proxy, and Flutter Mobile Client.*  
+> *Built exclusively for Indian Municipal Governance: Delhi Jal Board (DJB), Municipal Corporation of Delhi (MCD), NDMC, Jal Jeevan Mission, and AMRUT 2.0.*
 
 ---
 
-## 🚀 Key Features
-
-### 1. 📷 Data Collection & EXIF Intake
-- **Zero-Friction Incident Reporting**: Citizens upload photos or videos of water emergencies (Burst Main, Sewage Ingress, Low Pressure, Contamination, Open Drain).
-- **Automated EXIF Metadata Extraction**: Extracts precise GPS latitude/longitude, altitude, timestamp, and device details via Drew Noakes `metadata-extractor`.
-- **Reverse Geocoding**: Resolves raw coordinates into Indian localities, municipal wards (e.g., Ward 85 Karol Bagh, Ward 142 Lajpat Nagar), and Indian PIN codes (e.g., 110005, 110024).
-
-### 2. 🗺️ Geospatial Visualization & Leaflet Dashboard
-- **Interactive OpenStreetMap Interface**: Responsive web console with live incident pins color-coded by issue type.
-- **Thermal Density Heatmap**: Built using `Leaflet.heat` for instant visual hotspot identification.
-- **Convex Hull Envelopes**: Visualizes cluster boundaries computed geometrically via Java Topology Suite (JTS).
-- **Incident Inspector**: Real-time inspection drawer displaying reverse-geocoded addresses, evidence photos, status, and citizen verification counts.
-
-### 3. 🧠 Geodesic DBSCAN Spatial Clustering & Root Cause Diagnostics
-- **Haversine DBSCAN Algorithm**: Groups reports within a tunable 300-meter radius into unified emergency clusters.
-- **Root Cause Correlation Engine**: Automatically recognizes underlying infrastructure failure patterns:
-  - *Main Feeder Pipe Fracture* (Co-located high-pressure leaks & low-pressure drops)
-  - *Sewerage Cross-Contamination / Ingress* (Simultaneous dirty water reports near drainage sumps)
-  - *Pumping Station Operational Failure* (Widespread zero-pressure reports across an entire ward)
-  - *Monsoon Drain Siltation & Backflow* (Localized road waterlogging)
-- **Dynamic Severity Scoring**: Computes severity levels (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`) based on citizen volume, rate of incoming reports, and vulnerability zones (e.g., hospitals, schools).
-
-### 4. 📄 Automated Official Municipal Dossier (PDF)
-- **Executive Engineering Dossiers**: Generates downloadable Government of NCT of Delhi / Delhi Jal Board standard PDF reports via OpenHtmlToPdf.
-- **Key Dossier Components**:
-  - Official bilingual headers (Delhi Jal Board / जल बोर्ड)
-  - Ward jurisdiction and nodal officer contact details
-  - JTS-computed centroid coordinates and cluster bounding envelope
-  - Citizen evidence photo sheet with timestamps and phone hashes
-  - Work Order dispatch instructions under Jal Jeevan Mission & AMRUT 2.0 standards
-
-### 5. ⚡ Automated Dispatch & Citizen Feedback Loop
-- **Spatial Ward Boundary Containment**: Routes alerts directly to the designated Assistant Engineer (AE) / Executive Engineer (EE).
-- **Municipal Webhook Integration**: Simulates immediate dispatch payloads to municipal CRM portals.
-- **Citizen Notification Simulation**: Sends SMS/WhatsApp status updates and estimated resolution times to affected residents.
-
----
-
-## 🛠️ Technology Stack
-
-| Component                 | Technology                                            | Version / Spec                                                                       |
-|---------------------------|-------------------------------------------------------|--------------------------------------------------------------------------------------|
-| **Runtime & Language**    | Java (LTS)                                            | **Java 25**                                                                          |
-| **Framework**             | Spring Boot                                           | **3.4.13**                                                                           |
-| **Boilerplate Reduction** | Project Lombok                                        | **1.18.38** (`@Getter`, `@Setter`, `@Builder`, `@RequiredArgsConstructor`, `@Slf4j`) |
-| **Spatial Engine**        | JTS (Java Topology Suite) & Hibernate Spatial         | `1.19.0`                                                                             |
-| **EXIF Parsing**          | Drew Noakes Metadata Extractor                        | `2.19.0`                                                                             |
-| **PDF Engine**            | OpenHtmlToPdf & Apache PDFBox                         | `1.0.10`                                                                             |
-| **Mathematics**           | Apache Commons Math 3                                 | `3.6.1` (Haversine & DBSCAN clustering)                                              |
-| **Frontend UI**           | HTML5, CSS3, Vanilla JS, Leaflet.js, Leaflet-heat     | Leaflet 1.9.4                                                                        |
-| **Database**              | H2 Database (Dev) / PostgreSQL PostGIS (Prod profile) | Embedded File-based H2                                                               |
-| **API Docs**              | Springdoc OpenAPI & Swagger UI                        | `2.6.0`                                                                              |
-
----
-
-## 📋 Project Structure
+## 🏛️ System Architecture Blueprint
 
 ```
-CrowdFlow/
-├── src/
-│   ├── main/
-│   │   ├── java/com/civic/waterwatch/
-│   │   │   ├── WaterWatchApplication.java             # Main Application Entry Point
-│   │   │   ├── config/
-│   │   │   │   └── OpenApiConfig.java                 # Swagger / OpenAPI Configuration
-│   │   │   ├── incident/
-│   │   │   │   ├── controller/IncidentReportController.java
-│   │   │   │   ├── controller/MediaStorageController.java
-│   │   │   │   ├── dto/                               # Request, Response, and GeoJSON DTOs
-│   │   │   │   ├── model/                             # WaterReport, IssueType, ReportStatus
-│   │   │   │   ├── repository/WaterReportRepository.java
-│   │   │   │   └── service/                           # EXIF Parser, Geocoding, Intake Service
-│   │   │   ├── clustering/
-│   │   │   │   ├── controller/IncidentClusterController.java
-│   │   │   │   ├── model/                             # IncidentCluster, RootCauseAnalysis
-│   │   │   │   ├── service/SpatialClusteringService.java      # Geodesic DBSCAN & Convex Hull
-│   │   │   │   ├── service/RootCauseCorrelationEngine.java    # Diagnostic Patterns
-│   │   │   │   └── service/ClusterScheduler.java              # Background Cluster Polling
-│   │   │   ├── reporting/
-│   │   │   │   └── service/PdfReportService.java      # OpenHtmlToPdf Municipal Dossier Service
-│   │   │   ├── ward/
-│   │   │   │   ├── model/MunicipalWard.java           # Delhi Ward Boundaries & Nodal Officers
-│   │   │   │   └── service/WardRoutingService.java    # Spatial Ward Containment
-│   │   │   └── dispatch/
-│   │   │       ├── controller/MunicipalPortalController.java
-│   │   │       ├── model/DispatchLog.java
-│   │   │       └── service/                           # Dispatch & Citizen Notification
-│   │   └── resources/
-│   │       ├── application.yml                        # Configuration (Port 8085, H2)
-│   │       ├── application-postgres.yml               # Production PostGIS profile
-│   │       ├── static/
-│   │       │   ├── index.html                         # Interactive Civic Dashboard
-│   │       │   ├── css/style.css                      # Modern Civic-Tech Design System
-│   │       │   └── js/app.js                          # Leaflet & Cluster Interaction Logic
-│   │       └── templates/
-│   │           └── incident-report.html               # Municipal PDF Dossier Template
-│   └── test/
-│       └── java/com/civic/waterwatch/
-│           ├── WaterWatchIntegrationTest.java         # End-to-end integration tests
-│           ├── clustering/SpatialClusteringDistanceTest.java
-│           ├── clustering/RootCauseCorrelationTest.java
-│           └── ward/WardRoutingTest.java
-├── pom.xml                                            # Maven configuration (Java 25)
-└── README.md
+                       ┌──────────────────────────────────────────────────┐
+                       │          MOBILE CLIENT (Flutter / Dart)          │
+                       │   Camera + EXIF • Offline Queue • MapLibre GL    │
+                       └────────────────────────┬─────────────────────────┘
+                                                │ HTTPS / REST (Multipart)
+                                                ▼
+                       ┌──────────────────────────────────────────────────┐
+                       │          REVERSE PROXY & GATEWAY (Nginx)         │
+                       └────────────────────────┬─────────────────────────┘
+                                                │
+                                                ▼
+                       ┌──────────────────────────────────────────────────┐
+                       │           BACKEND API (Spring Boot 3.4)          │
+                       │         Java 25 (Virtual Threads / Loom)         │
+                       │  Spring Security • JTS Suite • Metadata-Extract  │
+                       └──────┬──────────────────────┬────────────────────┘
+                              │                      │
+            ┌─────────────────┴──────┐        ┌──────┴────────────────────┐
+            ▼                        ▼        ▼                           ▼
+┌────────────────────────┐  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐
+│       POSTGRESQL       │  │ S3 / MINIO   │  │   TASK QUEUE │  │    REDIS 7.x      │
+│     with PostGIS       │  │ (Image Store)│  │ (Async Loom) │  │  (Auth, Tokens,   │
+│ (Spatial Clustering &  │  └──────────────┘  └──────┬───────┘  │  Geo-Tile Cache)  │
+│  Geom Indexed Tables)  │                           │          └───────────────────┘
+└────────────────────────┘                           ▼
+                                      ┌──────────────────────────────┐
+                                      │  ASYNC REPORTING & DISPATCH  │
+                                      │   ST_ClusterDBSCAN / DBSCAN  │
+                                      │   Thymeleaf + OpenHTMLtoPDF  │
+                                      │   Webhooks (ICCC) + Fast2SMS │
+                                      └──────────────────────────────┘
 ```
 
 ---
 
-## ⚡ Getting Started
+## 🏗️ 7-Layer Production Specification
 
-### Prerequisites
-- **JDK 25** (Oracle JDK 25 or OpenJDK 25)
-- **Apache Maven 3.9+**
-- Git
+### Layer 1: Mobile Client (Cross-Platform)
+- **Framework**: Flutter 3.x (Dart 3.x) with 60 FPS vector map rendering.
+- **Vector Maps**: `maplibre_gl` client-side GPU-accelerated rendering for cluster bubbles and vector tiles.
+- **Geolocation**: `geolocator` capturing high-accuracy GPS coordinates at reporting sites.
+- **Live Camera**: `camera` + `image_picker` enforcing live camera capture over stale gallery uploads.
+- **Hardware EXIF**: `native_exif` reading raw GPS coordinates, altitude, and timestamp directly from device sensors.
+- **Local Offline Cache**: `drift` (SQLite) offline queue auto-syncing when connectivity is restored.
+- **Resilient Uploads**: `dio` chunked multipart HTTP uploads with background retries.
+- *Scaffolded directory*: [`mobile_client/`](file:///d:/CrowdFlow/mobile_client/)
 
-### Build & Run Tests
-```bash
-mvn clean test
-```
+### Layer 2: API Gateway & Application Server (Java 25 Core)
+- **Language & Runtime**: **Java 25 (LTS)** utilizing **Virtual Threads (Project Loom)** for handling concurrent multipart file uploads without OS thread exhaustion (`spring.threads.virtual.enabled: true`).
+- **Core Framework**: Spring Boot 3.4.13 (`spring-boot-starter-web`, `spring-boot-starter-validation`, `spring-boot-starter-data-jpa`).
+- **Spatial Integration**: `org.hibernate.orm:hibernate-spatial` for native PostGIS mapping.
+- **Geometry Engine**: `org.locationtech.jts:jts-core:1.19.0` (Points, Polygons, Bounding Envelopes, Convex Hulls).
+- **EXIF Extraction**: `com.drewnoakes:metadata-extractor:2.19.0` extracting camera model, GPS coordinates, and exposure timestamps.
+- **Image Sanitization & Optimization**: `net.coobird:thumbnailator:0.4.20` auto-orienting images, stripping personal identifiable metadata (PII), and generating 300x300 thumbnails.
+- **Security & RBAC**: Spring Security 6.x + JJWT (`0.12.6`) supporting OTP mobile login (`+91`) and Role-Based Access Control (`ROLE_CITIZEN`, `ROLE_WARD_OFFICER`, `ROLE_SUPER_ADMIN`).
 
-### Launch the Application
-```bash
-mvn spring-boot:run
-```
+### Layer 3: Database, Geospatial Engine & Storage
+- **Relational DB**: PostgreSQL 16+ with PostGIS 3.4+ extension (`postgis/postgis:16-3.4`) for production, and file-based H2 for embedded development.
+- **Spatial Indexing & Functions**: GIST indexing, `ST_ClusterDBSCAN`, `ST_ConvexHull`, and `ST_Contains` for ward boundaries.
+- **In-Memory Cache**: Redis 7.x (`redis:7.2-alpine`) for token storage, geo-tile caching, and rate-limiting counters.
+- **Object Storage**: AWS S3 / MinIO (`minio/minio`) for secure image hosting and generated PDF dossiers.
 
-Once running, navigate to:
-- **Interactive Dashboard**: [http://localhost:8085](http://localhost:8085)
-- **Swagger API Documentation**: [http://localhost:8085/swagger-ui.html](http://localhost:8085/swagger-ui.html)
-- **H2 Web Console**: [http://localhost:8085/h2-console](http://localhost:8085/h2-console) (JDBC URL: `jdbc:h2:file:./data/waterwatch`)
+### Layer 4: Asynchronous Processing & Clustering Execution
+- **Task Execution**: Spring Task Execution backed by Java 25 Virtual Threads for decoupled intake.
+- **Scheduling**: `@Scheduled` cluster evaluation running every 2 minutes across Indian municipal wards.
+- **Clustering Algorithms**: Geodesic Haversine DBSCAN algorithm ($\varepsilon = 150\text{m}$, $\text{MinPts} = 3$) with root-cause correlation engine (Feeder Burst, Sewage Ingress, Pumping Station Trip, Storm Sump Choke).
+
+### Layer 5: GIS, Reverse Geocoding & Mapping Services
+- **Base Tiles & Heatmap**: OpenStreetMap and Leaflet.js with `Leaflet.heat` for dynamic thermal hotspot rendering.
+- **Reverse Geocoding**: Resolves raw GPS coordinates into Indian localities, municipal wards (e.g. Ward 85 Karol Bagh, Ward 142 Lajpat Nagar), and PIN codes (110005, 110024).
+- **Ward Polygons**: Spatial boundary containment routing incidents to Delhi Jal Board (DJB) Executive Engineers.
+
+### Layer 6: Automated PDF Generation & Municipal Dispatch
+- **PDF Engine**: OpenHtmlToPdf + Apache PDFBox compiling official bilingual (English / Hindi जल बोर्ड) Government of NCT of Delhi / Delhi Jal Board incident dossiers.
+- **Municipal Dispatch**: Reactive HTTP webhooks pushing incident payloads to City Command & Control Centers (ICCC).
+- **Citizen Communication**: SMS / WhatsApp status updates simulation (Fast2SMS / MSG91).
+- **Email Dispatch**: `JavaMailSender` routing PDF dossiers to nodal engineers.
+
+### Layer 7: DevOps, Infrastructure & Monitoring
+- **Containerization**: Multi-stage [`Dockerfile`](file:///d:/CrowdFlow/Dockerfile) with secure non-root user and ZGC garbage collector flags.
+- **Orchestration**: [`docker-compose.yml`](file:///d:/CrowdFlow/docker-compose.yml) deploying App, PostGIS 16, Redis 7, MinIO S3, and Nginx.
+- **Reverse Proxy**: [`nginx/nginx.conf`](file:///d:/CrowdFlow/nginx/nginx.conf) with rate-limiting (`15r/m`), gzip compression for GeoJSON, and security headers.
+- **CI/CD Pipeline**: [`.github/workflows/ci.yml`](file:///d:/CrowdFlow/.github/workflows/ci.yml) compiling and running test suites on Java 25.
+- **Observability**: Spring Boot Actuator + Prometheus metrics at `/actuator/prometheus` tracking live reports, active clusters, and resolution velocity.
 
 ---
 
 ## 📡 REST API Reference
 
-| Method | Endpoint                           | Description                                              |
-|--------|------------------------------------|----------------------------------------------------------|
-| `POST` | `/api/reports`                     | Submit incident report with JSON metadata                |
-| `POST` | `/api/reports/upload-image`        | Upload incident photo with automated EXIF intake         |
-| `GET`  | `/api/reports`                     | Retrieve list of citizen incident reports                |
-| `GET`  | `/api/reports/geojson`             | Stream reports as RFC-7946 GeoJSON FeatureCollection     |
-| `POST` | `/api/clusters/trigger-clustering` | Trigger on-demand Haversine DBSCAN clustering run        |
-| `GET`  | `/api/clusters`                    | List active emergency incident clusters                  |
-| `GET`  | `/api/clusters/{id}/pdf-report`    | Download official DJB municipal escalation PDF dossier   |
-| `GET`  | `/api/wards`                       | List configured Delhi municipal wards and nodal officers |
-| `GET`  | `/api/municipal/dispatch-logs`     | View automated dispatch logs and citizen notifications   |
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/send-otp` | Public | Send 6-digit OTP to Indian phone (`+91`) |
+| `POST` | `/api/auth/verify-otp` | Public | Verify OTP & obtain JWT Bearer Token |
+| `POST` | `/api/reports` | Public / Citizen | Submit incident with multipart media & EXIF extraction |
+| `POST` | `/api/reports/extract-exif` | Public | Preview EXIF GPS coordinates from photo |
+| `GET` | `/api/reports` | Public | List all Indian water incident reports |
+| `GET` | `/api/reports/geojson` | Public | Stream GeoJSON FeatureCollection for vector maps |
+| `GET` | `/api/reports/heatmap` | Public | Retrieve weighted points for thermal heatmap |
+| `POST` | `/api/clusters/trigger-clustering` | Public / Officer | Trigger on-demand DBSCAN clustering run |
+| `GET` | `/api/clusters` | Public | List active emergency incident clusters |
+| `GET` | `/api/clusters/{id}/pdf-report` | Public / Officer | Download official DJB municipal escalation PDF dossier |
+| `GET` | `/api/wards` | Public | List Delhi municipal wards and nodal officers |
+| `GET` | `/api/municipal/dispatch-logs` | Public / Officer | View dispatch logs and citizen notifications |
+| `GET` | `/actuator/prometheus` | Public / Admin | Scrape Prometheus operational metrics |
 
 ---
 
-## 🏛️ Indian Civic Context & Standards
+## ⚡ Quickstart Guide
 
-- **Authorities Modeled**: Delhi Jal Board (DJB), Municipal Corporation of Delhi (MCD), New Delhi Municipal Council (NDMC).
-- **Civic Hotlines**: Centralized DJB Helpline `1916`, MCD Centralized Toll-Free `1533`.
-- **National Missions**: Aligned with Ministry of Jal Shakti guidelines, Jal Jeevan Mission (Urban), and AMRUT 2.0 service level benchmarks.
+### 1. Run Locally (Embedded Dev Mode)
+```bash
+# Verify test suite on Java 25
+mvn clean test
+
+# Launch Spring Boot with Virtual Threads and embedded H2
+mvn spring-boot:run
+```
+- Web Console: [http://localhost:8085](http://localhost:8085)
+- Swagger UI: [http://localhost:8085/swagger-ui.html](http://localhost:8085/swagger-ui.html)
+- Prometheus Metrics: [http://localhost:8085/actuator/prometheus](http://localhost:8085/actuator/prometheus)
+
+### 2. Run Multi-Container Stack with Docker Compose
+```bash
+docker compose up -d --build
+```
+This spins up:
+- **Nginx API Gateway**: `http://localhost` (Port 80)
+- **Spring Boot Monolith (Java 25)**: Port 8085
+- **PostgreSQL 16 + PostGIS 3.4**: Port 5432
+- **Redis 7.2**: Port 6379
+- **MinIO S3 Console**: [http://localhost:9001](http://localhost:9001) (`minioadmin` / `minioadmin`)
 
 ---
+
+## 📄 License
+Open-source under the [MIT License](LICENSE).

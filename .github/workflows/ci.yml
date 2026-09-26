@@ -1,0 +1,38 @@
+name: CrowdFlow CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    name: Build & Verify (Java 25 & Spring Boot 3.4)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Oracle JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'oracle'
+          cache: maven
+
+      - name: Compile and Run Unit & Integration Tests
+        run: |
+          mvn clean test -B -Dspring.classformat.ignore=true
+
+      - name: Verify Multi-Container Compose Syntax
+        run: |
+          docker compose config --quiet
+
+      - name: Upload Test Report Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/

@@ -6,6 +6,9 @@ spring:
     name: waterwatch-platform-india
   profiles:
     active: dev
+  threads:
+    virtual:
+      enabled: true
 
   datasource:
     url: jdbc:h2:file:./data/waterwatch;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
@@ -56,6 +59,15 @@ waterwatch:
   storage:
     upload-dir: ./uploads
     reports-dir: ./generated-reports
+    s3:
+      enabled: false
+      endpoint: http://localhost:9000
+      bucket-name: crowdflow-media
+      access-key: minioadmin
+      secret-key: minioadmin
+  security:
+    jwt-secret: "4c7a6e9f1d2b8c5e3a7f9b0c2d4e6f8a1b3c5e7d9f0a2b4c6e8d0f2a4b6c8e0"
+    jwt-expiration-ms: 86400000 # 24 hours
   clustering:
     eps-meters: 150.0
     min-points: 3
@@ -72,6 +84,17 @@ waterwatch:
     default-lon: 77.2105
     default-city: "National Capital Territory of Delhi, India"
     helpline: "1916"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
 
 springdoc:
   api-docs:

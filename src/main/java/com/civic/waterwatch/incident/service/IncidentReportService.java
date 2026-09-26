@@ -31,6 +31,8 @@ public class IncidentReportService {
     private final WaterReportRepository reportRepository;
     private final ExifParserService exifParserService;
     private final ReverseGeocodingService reverseGeocodingService;
+    private final ImageOptimizationService imageOptimizationService;
+    private final com.civic.waterwatch.storage.ObjectStorageService objectStorageService;
 
     @Value("${waterwatch.storage.upload-dir:./uploads}")
     private String uploadDir;
@@ -61,17 +63,7 @@ public class IncidentReportService {
 
         if (file != null && !file.isEmpty()) {
             try {
-                Path targetDir = Paths.get(uploadDir);
-                if (!Files.exists(targetDir)) {
-                    Files.createDirectories(targetDir);
-                }
-                String cleanName = System.currentTimeMillis() + "_" + file.getOriginalFilename().replaceAll("[^a-zA-Z0-9.-]", "_");
-                Path targetPath = targetDir.resolve(cleanName);
-                try (InputStream is = file.getInputStream()) {
-                    Files.copy(is, targetPath, StandardCopyOption.REPLACE_EXISTING);
-                }
-                report.setImageUrl("/api/media/" + cleanName);
-
+                // 1. Extract EXIF metadata (GPS, Timestamp, Device) before PII stripping
                 ExifMetadataResult exifResult = exifParserService.extractMetadata(file);
                 if (exifResult.isHasGps()) {
                     finalLat = exifResult.getLatitude();
@@ -84,8 +76,26 @@ public class IncidentReportService {
                 if (exifResult.getCameraModel() != null) {
                     deviceModel = (exifResult.getCameraMake() != null ? exifResult.getCameraMake() + " " : "") + exifResult.getCameraModel();
                 }
+
+                // 2. Sanitize & compress image (auto-orient, strip PII, generate clean JPEG)
+                byte[] rawBytes = file.getBytes();
+                ImageOptimizationService.OptimizedImageResult optResult = imageOptimizationService.processAndSanitizeImage(rawBytes);
+                byte[] bytesToStore = (optResult != null && optResult.getOptimizedImageBytes() != null)
+                        ? optResult.getOptimizedImageBytes()
+                        : rawBytes;
+
+                String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "report_evidence.jpg";
+                String cleanName = System.currentTimeMillis() + "_" + originalName.replaceAll("[^a-zA-Z0-9.-]", "_");
+                if (!cleanName.toLowerCase().endsWith(".jpg") && !cleanName.toLowerCase().endsWith(".jpeg") && !cleanName.toLowerCase().endsWith(".png")) {
+                    cleanName += ".jpg";
+                }
+
+                // 3. Store via unified ObjectStorageService (S3 / MinIO / Local)
+                String storedUrl = objectStorageService.storeMedia(cleanName, bytesToStore, "image/jpeg");
+                report.setImageUrl(storedUrl);
+
             } catch (Exception e) {
-                log.warn("Failed to store uploaded media file: {}", e.getMessage());
+                log.warn("Failed to store/optimize uploaded media file: {}", e.getMessage());
             }
         } else if (dto.getImageUrl() != null && !dto.getImageUrl().isBlank()) {
             report.setImageUrl(dto.getImageUrl());

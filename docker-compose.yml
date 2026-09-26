@@ -1,0 +1,125 @@
+version: '3.8'
+
+networks:
+  crowdflow-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  media_uploads:
+  generated_dossiers:
+
+services:
+  # ==========================================================
+  # 1. Reverse Proxy & API Gateway (Nginx)
+  # ==========================================================
+  nginx:
+    image: nginx:alpine
+    container_name: crowdflow-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    networks:
+      - crowdflow-net
+
+  # ==========================================================
+  # 2. CrowdFlow Application Core (Java 25 & Spring Boot 3.4)
+  # ==========================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crowdflow-app
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=waterwatch
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - S3_ENABLED=true
+      - S3_ENDPOINT=http://minio:9000
+      - S3_BUCKET=crowdflow-media
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - JAVA_OPTS=-Dspring.classformat.ignore=true -XX:+UseZGC -XX:+ZGenerational -Xms512m -Xmx1024m
+    volumes:
+      - media_uploads:/app/uploads
+      - generated_dossiers:/app/generated-reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    networks:
+      - crowdflow-net
+
+  # ==========================================================
+  # 3. Spatial Relational Database (PostgreSQL 16 + PostGIS 3.4)
+  # ==========================================================
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: crowdflow-postgis
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=waterwatch
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d waterwatch"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crowdflow-net
+
+  # ==========================================================
+  # 4. In-Memory Cache & Token Store (Redis 7.x)
+  # ==========================================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: crowdflow-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - crowdflow-net
+
+  # ==========================================================
+  # 5. Object Storage (MinIO / S3 API Compatible)
+  # ==========================================================
+  minio:
+    image: minio/minio:latest
+    container_name: crowdflow-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000" # S3 API Port
+      - "9001:9001" # Web Console Port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - crowdflow-net
