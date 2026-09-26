@@ -1,53 +1,83 @@
+# ==============================================================================
+# CrowdFlow India - Production-Grade Multi-Container Docker Compose Stack
+# Includes: PostgreSQL 16 + PostGIS 3.4, Redis 7.2, Nginx Gateway, Spring Boot 3.4
+# ==============================================================================
+
 networks:
   crowdflow-net:
     driver: bridge
+    name: crowdflow-net
 
 volumes:
   postgres_data:
+    name: crowdflow_postgres_data
   redis_data:
+    name: crowdflow_redis_data
   media_uploads:
+    name: crowdflow_media_uploads
   generated_dossiers:
+    name: crowdflow_generated_dossiers
 
 services:
-  # ==========================================================
-  # 1. Reverse Proxy & API Gateway (Nginx)
-  # ==========================================================
+  # ============================================================================
+  # 1. Reverse Proxy, Rate Limiter & API Gateway (Nginx)
+  # ============================================================================
   nginx:
     image: nginx:alpine
     container_name: crowdflow-nginx
     restart: unless-stopped
     ports:
-      - "8088:80"
+      - "${GATEWAY_PORT:-8088}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     networks:
       - crowdflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -q healthy || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
 
-  # ==========================================================
-  # 2. CrowdFlow Application Core (Java 25 & Spring Boot 3.4)
-  # ==========================================================
+  # ============================================================================
+  # 2. CrowdFlow Application Core Monolith (Java 25 LTS & Spring Boot 3.4)
+  # ============================================================================
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        JAR_FILE: target/waterwatch-platform-1.0.0-SNAPSHOT.jar
     image: crowdflow-app:latest
     container_name: crowdflow-app
     restart: unless-stopped
+    stop_grace_period: 30s
     ports:
-      - "8085:8085"
+      - "${APP_PORT:-8085}:8085"
     environment:
-      - SPRING_PROFILES_ACTIVE=postgres
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=waterwatch
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - S3_ENABLED=false
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=6379
-      - JAVA_OPTS=-Dspring.classformat.ignore=true -XX:+UseZGC -Xms512m -Xmx1024m
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-postgres}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${POSTGRES_DB:-waterwatch}
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - SPRING_DATA_REDIS_HOST=${REDIS_HOST:-redis}
+      - SPRING_DATA_REDIS_PORT=${REDIS_PORT_INTERNAL:-6379}
+      - S3_ENABLED=${S3_ENABLED:-false}
+      - JAVA_OPTS=${JAVA_OPTS:--Dspring.classformat.ignore=true -XX:+UseZGC -Xms256m -Xmx1024m -Djava.awt.headless=true -Dfile.encoding=UTF-8}
     volumes:
       - media_uploads:/app/uploads
       - generated_dossiers:/app/generated-reports
@@ -55,44 +85,136 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - crowdflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8085/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1536M
+        reservations:
+          cpus: "0.5"
+          memory: 384M
 
-  # ==========================================================
-  # 3. Spatial Relational Database (PostgreSQL 16 + PostGIS 3.4)
-  # ==========================================================
+  # ============================================================================
+  # 3. Spatial Relational Database (PostgreSQL 16 + PostGIS 3.4 Spatial Extensions)
+  # ============================================================================
   postgres:
     image: postgis/postgis:16-3.4
     container_name: crowdflow-postgis
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=waterwatch
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-waterwatch}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "effective_cache_size=512MB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "timezone=Asia/Kolkata"
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d waterwatch"]
-      interval: 3s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-waterwatch}"]
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - crowdflow-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+        reservations:
+          memory: 256M
 
-  # ==========================================================
-  # 4. In-Memory Cache & Token Store (Redis 7.x)
-  # ==========================================================
+  # ============================================================================
+  # 4. In-Memory Cache & Token Store (Redis 7.2 Alpine)
+  # ============================================================================
   redis:
     image: redis:7.2-alpine
     container_name: crowdflow-redis
     restart: unless-stopped
     ports:
-      - "6382:6379"
+      - "${REDIS_PORT:-6382}:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     networks:
       - crowdflow-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+
+  # ============================================================================
+  # 5. Developer Spatial DB Web Inspector (pgweb) - Optional Profile
+  # Usage: docker compose --profile tools up -d pgweb -> http://localhost:8089
+  # ============================================================================
+  pgweb:
+    image: sosedoff/pgweb:latest
+    container_name: crowdflow-pgweb
+    restart: unless-stopped
+    profiles:
+      - tools
+    ports:
+      - "${PGWEB_PORT:-8089}:8081"
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-waterwatch}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - crowdflow-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"

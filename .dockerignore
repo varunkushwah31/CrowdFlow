@@ -1,0 +1,37 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# IDE and editors
+.idea
+.vscode
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings
+
+# Build artifacts & caches (only copy target/*.jar)
+target/classes
+target/test-classes
+target/generated-sources
+target/generated-test-sources
+target/maven-archiver
+target/maven-status
+target/surefire-reports
+
+# Local application data and logs
+data/
+uploads/
+generated-reports/
+*.log
+
+# Mobile client & documentation
+mobile_client/
+*.md
+
+# OS files
+.DS_Store
+Thumbs.db
