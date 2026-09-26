@@ -51,18 +51,18 @@
 
 ## 🛠️ Technology Stack
 
-| Component | Technology | Version / Spec |
-|---|---|---|
-| **Runtime & Language** | Java (LTS) | **Java 25** |
-| **Framework** | Spring Boot | **3.4.13** |
-| **Boilerplate Reduction** | Project Lombok | **1.18.38** (`@Getter`, `@Setter`, `@Builder`, `@RequiredArgsConstructor`, `@Slf4j`) |
-| **Spatial Engine** | JTS (Java Topology Suite) & Hibernate Spatial | `1.19.0` |
-| **EXIF Parsing** | Drew Noakes Metadata Extractor | `2.19.0` |
-| **PDF Engine** | OpenHtmlToPdf & Apache PDFBox | `1.0.10` |
-| **Mathematics** | Apache Commons Math 3 | `3.6.1` (Haversine & DBSCAN clustering) |
-| **Frontend UI** | HTML5, CSS3, Vanilla JS, Leaflet.js, Leaflet-heat | Leaflet 1.9.4 |
-| **Database** | H2 Database (Dev) / PostgreSQL PostGIS (Prod profile) | Embedded File-based H2 |
-| **API Docs** | Springdoc OpenAPI & Swagger UI | `2.6.0` |
+| Component                 | Technology                                            | Version / Spec                                                                       |
+|---------------------------|-------------------------------------------------------|--------------------------------------------------------------------------------------|
+| **Runtime & Language**    | Java (LTS)                                            | **Java 25**                                                                          |
+| **Framework**             | Spring Boot                                           | **3.4.13**                                                                           |
+| **Boilerplate Reduction** | Project Lombok                                        | **1.18.38** (`@Getter`, `@Setter`, `@Builder`, `@RequiredArgsConstructor`, `@Slf4j`) |
+| **Spatial Engine**        | JTS (Java Topology Suite) & Hibernate Spatial         | `1.19.0`                                                                             |
+| **EXIF Parsing**          | Drew Noakes Metadata Extractor                        | `2.19.0`                                                                             |
+| **PDF Engine**            | OpenHtmlToPdf & Apache PDFBox                         | `1.0.10`                                                                             |
+| **Mathematics**           | Apache Commons Math 3                                 | `3.6.1` (Haversine & DBSCAN clustering)                                              |
+| **Frontend UI**           | HTML5, CSS3, Vanilla JS, Leaflet.js, Leaflet-heat     | Leaflet 1.9.4                                                                        |
+| **Database**              | H2 Database (Dev) / PostgreSQL PostGIS (Prod profile) | Embedded File-based H2                                                               |
+| **API Docs**              | Springdoc OpenAPI & Swagger UI                        | `2.6.0`                                                                              |
 
 ---
 
@@ -145,17 +145,17 @@ Once running, navigate to:
 
 ## 📡 REST API Reference
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/reports` | Submit incident report with JSON metadata |
-| `POST` | `/api/reports/upload-image` | Upload incident photo with automated EXIF intake |
-| `GET` | `/api/reports` | Retrieve list of citizen incident reports |
-| `GET` | `/api/reports/geojson` | Stream reports as RFC-7946 GeoJSON FeatureCollection |
-| `POST` | `/api/clusters/trigger-clustering`| Trigger on-demand Haversine DBSCAN clustering run |
-| `GET` | `/api/clusters` | List active emergency incident clusters |
-| `GET` | `/api/clusters/{id}/pdf-report` | Download official DJB municipal escalation PDF dossier |
-| `GET` | `/api/wards` | List configured Delhi municipal wards and nodal officers |
-| `GET` | `/api/municipal/dispatch-logs` | View automated dispatch logs and citizen notifications |
+| Method | Endpoint                           | Description                                              |
+|--------|------------------------------------|----------------------------------------------------------|
+| `POST` | `/api/reports`                     | Submit incident report with JSON metadata                |
+| `POST` | `/api/reports/upload-image`        | Upload incident photo with automated EXIF intake         |
+| `GET`  | `/api/reports`                     | Retrieve list of citizen incident reports                |
+| `GET`  | `/api/reports/geojson`             | Stream reports as RFC-7946 GeoJSON FeatureCollection     |
+| `POST` | `/api/clusters/trigger-clustering` | Trigger on-demand Haversine DBSCAN clustering run        |
+| `GET`  | `/api/clusters`                    | List active emergency incident clusters                  |
+| `GET`  | `/api/clusters/{id}/pdf-report`    | Download official DJB municipal escalation PDF dossier   |
+| `GET`  | `/api/wards`                       | List configured Delhi municipal wards and nodal officers |
+| `GET`  | `/api/municipal/dispatch-logs`     | View automated dispatch logs and citizen notifications   |
 
 ---
 
@@ -166,6 +166,3 @@ Once running, navigate to:
 - **National Missions**: Aligned with Ministry of Jal Shakti guidelines, Jal Jeevan Mission (Urban), and AMRUT 2.0 service level benchmarks.
 
 ---
-
-## 📄 License
-This project is open-source under the [MIT License](LICENSE).
