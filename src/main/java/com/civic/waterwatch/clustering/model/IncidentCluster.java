@@ -35,7 +35,6 @@ public class IncidentCluster {
     @Column(name = "radius_meters")
     private Double radiusMeters;
 
-    @Lob
     @Column(name = "boundary_geojson", columnDefinition = "TEXT")
     private String boundaryGeoJson;
 

@@ -40,7 +40,6 @@ public class WaterReport {
     @Column(name = "description", length = 2000)
     private String description;
 
-    @Lob
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
 

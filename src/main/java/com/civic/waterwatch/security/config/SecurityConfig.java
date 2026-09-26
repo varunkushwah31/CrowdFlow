@@ -34,12 +34,12 @@ public class SecurityConfig {
                         // Public Auth Endpoints (OTP)
                         .requestMatchers("/api/auth/**").permitAll()
                         // Crowdsourced Report Intake & GeoJSON / Heatmap Streaming
-                        .requestMatchers("/api/reports/**").permitAll()
+                        .requestMatchers("/api/reports", "/api/reports/**").permitAll()
                         // Geospatial Clusters, PDF Dossiers & Ward Polygons
-                        .requestMatchers("/api/clusters/**").permitAll()
-                        .requestMatchers("/api/wards/**").permitAll()
+                        .requestMatchers("/api/clusters", "/api/clusters/**").permitAll()
+                        .requestMatchers("/api/wards", "/api/wards/**").permitAll()
                         // Media Serving & Municipal Webhooks
-                        .requestMatchers("/api/media/**").permitAll()
+                        .requestMatchers("/api/media", "/api/media/**").permitAll()
                         .requestMatchers("/api/municipal/mock-webhook/**").permitAll()
                         .requestMatchers("/api/municipal/dispatch-logs").permitAll()
                         // Actuator Health, Info & Prometheus Metrics
