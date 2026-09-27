@@ -12,6 +12,7 @@ import java.time.Duration;
  * Citizen OTP Verification Service backed by Redis.
  * Enforces 5-minute expiration (TTL) and secure verification for Indian mobile numbers (+91).
  */
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
