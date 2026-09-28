@@ -9,6 +9,8 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.CacheErrorHandler;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -110,25 +112,25 @@ public class RedisConfig implements CachingConfigurer {
     public CacheErrorHandler errorHandler() {
         return new CacheErrorHandler() {
             @Override
-            public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
+            public void handleCacheGetError(@NonNull RuntimeException exception, @NonNull Cache cache, @NonNull Object key) {
                 log.warn("Redis cache GET failed for cache '{}', key '{}': {}. Falling back to DB.",
                         cache.getName(), key, exception.getMessage());
             }
 
             @Override
-            public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
+            public void handleCachePutError(@NonNull RuntimeException exception, @NonNull Cache cache, @NonNull Object key, @Nullable Object value) {
                 log.warn("Redis cache PUT failed for cache '{}', key '{}': {}. Proceeding without caching.",
                         cache.getName(), key, exception.getMessage());
             }
 
             @Override
-            public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
+            public void handleCacheEvictError(@NonNull RuntimeException exception, @NonNull Cache cache, @NonNull Object key) {
                 log.warn("Redis cache EVICT failed for cache '{}', key '{}': {}.",
                         cache.getName(), key, exception.getMessage());
             }
 
             @Override
-            public void handleCacheClearError(RuntimeException exception, Cache cache) {
+            public void handleCacheClearError(@NonNull RuntimeException exception, @NonNull Cache cache) {
                 log.warn("Redis cache CLEAR failed for cache '{}': {}.",
                         cache.getName(), exception.getMessage());
             }

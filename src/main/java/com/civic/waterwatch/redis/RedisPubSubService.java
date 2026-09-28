@@ -13,6 +13,8 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
@@ -75,7 +77,7 @@ public class RedisPubSubService implements MessageListener {
     }
 
     @Override
-    public void onMessage(Message message, byte[] pattern) {
+    public void onMessage(@NonNull Message message, @Nullable byte[] pattern) {
         try {
             String payload = new String(message.getBody());
             IncidentEventMessage event = objectMapper.readValue(payload, IncidentEventMessage.class);

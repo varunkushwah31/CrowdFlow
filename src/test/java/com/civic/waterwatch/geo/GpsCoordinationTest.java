@@ -13,16 +13,11 @@ import com.civic.waterwatch.ward.service.WardRoutingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.Example;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.repository.query.FluentQuery;
 
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -45,51 +40,23 @@ class GpsCoordinationTest {
 
         List<MunicipalWard> allWards = List.of(ward85);
 
-        MunicipalWardRepository stubRepo = new MunicipalWardRepository() {
-            @Override
-            public Optional<MunicipalWard> findByWardNumber(Integer wardNumber) {
-                return allWards.stream().filter(w -> w.getWardNumber().equals(wardNumber)).findFirst();
-            }
-
-            @Override
-            public List<MunicipalWard> findAll() {
-                return allWards;
-            }
-
-            @Override
-            public long count() {
-                return allWards.size();
-            }
-
-            @Override public void flush() {}
-            @Override public <S extends MunicipalWard> S saveAndFlush(S entity) { return entity; }
-            @Override public <S extends MunicipalWard> List<S> saveAllAndFlush(Iterable<S> entities) { return List.of(); }
-            @Override public void deleteAllInBatch(Iterable<MunicipalWard> entities) {}
-            @Override public void deleteAllByIdInBatch(Iterable<Long> ids) {}
-            @Override public void deleteAllInBatch() {}
-            @Override public MunicipalWard getOne(Long id) { return null; }
-            @Override public MunicipalWard getById(Long id) { return null; }
-            @Override public MunicipalWard getReferenceById(Long id) { return null; }
-            @Override public <S extends MunicipalWard> Optional<S> findOne(Example<S> example) { return Optional.empty(); }
-            @Override public <S extends MunicipalWard> List<S> findAll(Example<S> example) { return List.of(); }
-            @Override public <S extends MunicipalWard> List<S> findAll(Example<S> example, Sort sort) { return List.of(); }
-            @Override public <S extends MunicipalWard> Page<S> findAll(Example<S> example, Pageable pageable) { return null; }
-            @Override public <S extends MunicipalWard> long count(Example<S> example) { return 0; }
-            @Override public <S extends MunicipalWard> boolean exists(Example<S> example) { return false; }
-            @Override public <S extends MunicipalWard, R> R findBy(Example<S> example, Function<FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
-            @Override public <S extends MunicipalWard> S save(S entity) { return entity; }
-            @Override public <S extends MunicipalWard> List<S> saveAll(Iterable<S> entities) { return List.of(); }
-            @Override public Optional<MunicipalWard> findById(Long id) { return Optional.empty(); }
-            @Override public boolean existsById(Long id) { return false; }
-            @Override public List<MunicipalWard> findAllById(Iterable<Long> ids) { return List.of(); }
-            @Override public void deleteById(Long id) {}
-            @Override public void delete(MunicipalWard entity) {}
-            @Override public void deleteAllById(Iterable<? extends Long> ids) {}
-            @Override public void deleteAll(Iterable<? extends MunicipalWard> entities) {}
-            @Override public void deleteAll() {}
-            @Override public List<MunicipalWard> findAll(Sort sort) { return allWards; }
-            @Override public Page<MunicipalWard> findAll(Pageable pageable) { return null; }
-        };
+        MunicipalWardRepository stubRepo = (MunicipalWardRepository) Proxy.newProxyInstance(
+                MunicipalWardRepository.class.getClassLoader(),
+                new Class<?>[]{MunicipalWardRepository.class},
+                (proxy, method, args) -> {
+                    if ("findByWardNumber".equals(method.getName())) {
+                        Integer wardNumber = (Integer) args[0];
+                        return allWards.stream().filter(w -> w.getWardNumber().equals(wardNumber)).findFirst();
+                    }
+                    if ("findAll".equals(method.getName())) {
+                        return allWards;
+                    }
+                    if ("count".equals(method.getName())) {
+                        return (long) allWards.size();
+                    }
+                    return null;
+                }
+        );
 
         WardRoutingService wardRoutingService = new WardRoutingService(stubRepo);
         ReverseGeocodingService reverseGeocodingService = new ReverseGeocodingService(wardRoutingService);
