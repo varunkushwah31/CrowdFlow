@@ -232,9 +232,16 @@ body {
   border-color: var(--primary);
 }
 
-/* Map Canvas */
-#map {
+/* Map Canvas Wrapper & Layout */
+.map-container-wrapper {
   flex: 1;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+#map {
+  width: 100%;
   height: 100%;
   background: #e2e8f0;
 }
@@ -665,3 +672,382 @@ body {
 .star-btn.active, .star-btn:hover {
   color: #f59e0b;
 }
+
+/* ========================================================
+   GPS, COORDINATE HUD & MAPPING ENGINE STYLES (INDIA CIVIC)
+   ======================================================== */
+
+/* Floating Overlays */
+.map-overlay-top-left {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 999;
+  width: 320px;
+  max-width: calc(100% - 28px);
+}
+
+.map-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  border: 1px solid #cbd5e1;
+  overflow: visible;
+}
+
+.map-search-box .search-icon {
+  position: absolute;
+  left: 12px;
+  color: #0284c7;
+  font-size: 14px;
+}
+
+.map-search-box input {
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 10px 36px 10px 34px;
+  font-size: 13px;
+  border-radius: 8px;
+  font-family: inherit;
+  background: transparent;
+}
+
+.map-search-box button {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 13px;
+}
+.map-search-box button:hover {
+  color: #334155;
+}
+
+.map-search-dropdown {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.search-result-item {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background 0.15s;
+}
+.search-result-item:hover {
+  background: #f0f9ff;
+}
+.search-result-item:last-child {
+  border-bottom: none;
+}
+.search-result-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.search-result-locality {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Floating Top-Right Tools */
+.map-overlay-top-right {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 999;
+}
+
+.map-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 4px;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  border: 1px solid #cbd5e1;
+}
+
+.map-select-tool {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  outline: none;
+  cursor: pointer;
+  background: #f8fafc;
+}
+
+.map-tool-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.map-tool-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.map-tool-btn.active {
+  background: #0284c7;
+  color: white;
+  border-color: #0284c7;
+}
+
+/* Coordinate HUD (Heads-Up Display) */
+.map-coord-hud {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 998;
+  background: rgba(15, 23, 42, 0.90);
+  backdrop-filter: blur(8px);
+  color: #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  min-width: 320px;
+  pointer-events: auto;
+}
+
+.coord-hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.coord-hud-row:last-child {
+  margin-bottom: 0;
+}
+
+.coord-hud-label {
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.coord-hud-val {
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.hud-pill {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.hud-pill.in-bounds {
+  background: #15803d;
+  color: white;
+}
+.hud-pill.out-bounds {
+  background: #b91c1c;
+  color: white;
+}
+
+/* Floating HUDs (Emergency Dispatch & Radar Radius) */
+.map-floating-hud {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 999;
+  width: 380px;
+  max-width: calc(100% - 40px);
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: slideUpFade 0.25s ease-out;
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hud-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: white;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hud-title {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+}
+.hud-close-btn:hover {
+  color: white;
+}
+
+.hud-body {
+  padding: 14px;
+  font-size: 12px;
+}
+
+.dispatch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dispatch-stat-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.dispatch-stat-title {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.dispatch-stat-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 2px;
+}
+
+/* Custom Marker Pins for Leaflet */
+.depot-marker-pin {
+  width: 32px;
+  height: 32px;
+  background: #0284c7;
+  border-radius: 8px;
+  border: 2px solid white;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 15px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.depot-marker-pin:hover {
+  transform: scale(1.15);
+}
+
+.tanker-marker-pin {
+  width: 32px;
+  height: 32px;
+  background: #059669;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.tanker-marker-pin.dispatched {
+  background: #ea580c;
+}
+.tanker-marker-pin.filling {
+  background: #d97706;
+}
+.tanker-marker-pin:hover {
+  transform: scale(1.15);
+}
+
+/* Pulsing GPS Locate Marker */
+.locate-radar-pulse {
+  width: 18px;
+  height: 18px;
+  background: #0284c7;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.8);
+  position: relative;
+}
+.locate-radar-pulse::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #0284c7;
+  animation: radarBeacon 1.8s infinite ease-out;
+}
+
+@keyframes radarBeacon {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Ward Polygon Boundary Label */
+.ward-tooltip-badge {
+  background: rgba(15, 23, 42, 0.85);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+

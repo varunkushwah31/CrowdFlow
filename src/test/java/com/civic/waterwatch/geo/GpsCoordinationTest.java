@@ -1,0 +1,187 @@
+package com.civic.waterwatch.geo;
+
+import com.civic.waterwatch.geo.model.CoordinateValidationResult;
+import com.civic.waterwatch.geo.model.DispatchRoutePlan;
+import com.civic.waterwatch.geo.model.EmergencyDepot;
+import com.civic.waterwatch.geo.model.WaterTankerUnit;
+import com.civic.waterwatch.geo.service.GpsCoordinateService;
+import com.civic.waterwatch.geo.service.MunicipalCoordinationService;
+import com.civic.waterwatch.incident.service.ReverseGeocodingService;
+import com.civic.waterwatch.ward.model.MunicipalWard;
+import com.civic.waterwatch.ward.repository.MunicipalWardRepository;
+import com.civic.waterwatch.ward.service.WardRoutingService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.repository.query.FluentQuery;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class GpsCoordinationTest {
+
+    private GpsCoordinateService gpsCoordinateService;
+    private MunicipalCoordinationService municipalCoordinationService;
+
+    @BeforeEach
+    void setUp() {
+        MunicipalWard ward85 = new MunicipalWard(
+                85, "Ward 85 - Karol Bagh", "Central Zone",
+                "Delhi Jal Board (DJB)", "Delhi / India", "110005",
+                "Shri Alok Sharma", "EE - Water",
+                "ee.karolbagh@delhijalboard.nic.in", "+91 98110 23412", "1916",
+                "http://test/ward85",
+                28.6300, 28.6600, 77.1800, 77.2150,
+                28.6450, 77.1950
+        );
+
+        List<MunicipalWard> allWards = List.of(ward85);
+
+        MunicipalWardRepository stubRepo = new MunicipalWardRepository() {
+            @Override
+            public Optional<MunicipalWard> findByWardNumber(Integer wardNumber) {
+                return allWards.stream().filter(w -> w.getWardNumber().equals(wardNumber)).findFirst();
+            }
+
+            @Override
+            public List<MunicipalWard> findAll() {
+                return allWards;
+            }
+
+            @Override
+            public long count() {
+                return allWards.size();
+            }
+
+            @Override public void flush() {}
+            @Override public <S extends MunicipalWard> S saveAndFlush(S entity) { return entity; }
+            @Override public <S extends MunicipalWard> List<S> saveAllAndFlush(Iterable<S> entities) { return List.of(); }
+            @Override public void deleteAllInBatch(Iterable<MunicipalWard> entities) {}
+            @Override public void deleteAllByIdInBatch(Iterable<Long> ids) {}
+            @Override public void deleteAllInBatch() {}
+            @Override public MunicipalWard getOne(Long id) { return null; }
+            @Override public MunicipalWard getById(Long id) { return null; }
+            @Override public MunicipalWard getReferenceById(Long id) { return null; }
+            @Override public <S extends MunicipalWard> Optional<S> findOne(Example<S> example) { return Optional.empty(); }
+            @Override public <S extends MunicipalWard> List<S> findAll(Example<S> example) { return List.of(); }
+            @Override public <S extends MunicipalWard> List<S> findAll(Example<S> example, Sort sort) { return List.of(); }
+            @Override public <S extends MunicipalWard> Page<S> findAll(Example<S> example, Pageable pageable) { return null; }
+            @Override public <S extends MunicipalWard> long count(Example<S> example) { return 0; }
+            @Override public <S extends MunicipalWard> boolean exists(Example<S> example) { return false; }
+            @Override public <S extends MunicipalWard, R> R findBy(Example<S> example, Function<FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
+            @Override public <S extends MunicipalWard> S save(S entity) { return entity; }
+            @Override public <S extends MunicipalWard> List<S> saveAll(Iterable<S> entities) { return List.of(); }
+            @Override public Optional<MunicipalWard> findById(Long id) { return Optional.empty(); }
+            @Override public boolean existsById(Long id) { return false; }
+            @Override public List<MunicipalWard> findAllById(Iterable<Long> ids) { return List.of(); }
+            @Override public void deleteById(Long id) {}
+            @Override public void delete(MunicipalWard entity) {}
+            @Override public void deleteAllById(Iterable<? extends Long> ids) {}
+            @Override public void deleteAll(Iterable<? extends MunicipalWard> entities) {}
+            @Override public void deleteAll() {}
+            @Override public List<MunicipalWard> findAll(Sort sort) { return allWards; }
+            @Override public Page<MunicipalWard> findAll(Pageable pageable) { return null; }
+        };
+
+        WardRoutingService wardRoutingService = new WardRoutingService(stubRepo);
+        ReverseGeocodingService reverseGeocodingService = new ReverseGeocodingService(wardRoutingService);
+        gpsCoordinateService = new GpsCoordinateService(reverseGeocodingService, wardRoutingService);
+
+        municipalCoordinationService = new MunicipalCoordinationService(gpsCoordinateService, null);
+    }
+
+    @Test
+    @DisplayName("Should validate Delhi coordinates and produce accurate UTM, DMS, and Plus Code")
+    void testDelhiCoordinateValidation() {
+        double lat = 28.6445;
+        double lon = 77.1950;
+
+        CoordinateValidationResult result = gpsCoordinateService.validateAndEnrich(lat, lon);
+
+        assertTrue(result.isValidForIndia(), "Should be inside sovereign India boundaries");
+        assertTrue(result.isInDelhiNcr(), "Should be recognized inside Delhi NCR operational envelope");
+        assertNotNull(result.getDdFormat());
+        assertNotNull(result.getDmsFormat());
+        assertTrue(result.getDmsFormat().contains("28° 38'"));
+        assertTrue(result.getUtmZone().contains("43N"));
+        assertTrue(result.getUtmEasting() > 0);
+        assertTrue(result.getUtmNorthing() > 0);
+        assertNotNull(result.getIndianGridRef());
+        assertNotNull(result.getPlusCode());
+        assertTrue(result.getPlusCode().contains("+"), "Plus code should include '+' separator");
+    }
+
+    @Test
+    @DisplayName("Should detect coordinates outside India")
+    void testOutsideIndiaCoordinates() {
+        CoordinateValidationResult result = gpsCoordinateService.validateAndEnrich(51.5074, -0.1278); // London
+        assertFalse(result.isValidForIndia());
+        assertFalse(result.isInDelhiNcr());
+        assertTrue(result.getMessage().contains("outside"));
+    }
+
+    @Test
+    @DisplayName("Should compute accurate geodesic distance and bearing across Delhi")
+    void testGeodesicDistanceAndBearing() {
+        // From Karol Bagh (28.6445, 77.1950) to Lajpat Nagar (28.5710, 77.2415)
+        double distKm = gpsCoordinateService.calculateDistanceKm(28.6445, 77.1950, 28.5710, 77.2415);
+        assertTrue(distKm > 8.0 && distKm < 13.0, "Distance across central to south Delhi should be ~9-11 km, was: " + distKm);
+
+        double bearing = gpsCoordinateService.calculateBearing(28.6445, 77.1950, 28.5710, 77.2415);
+        assertTrue(bearing > 120.0 && bearing < 170.0, "Bearing heading south-southeast should be around 140-155 degrees, was: " + bearing);
+
+        String compass = gpsCoordinateService.getCompassDirection(bearing);
+        assertTrue(compass.contains("South") || compass.contains("East"));
+    }
+
+    @Test
+    @DisplayName("Should coordinate emergency dispatch to nearest DJB depot")
+    void testCoordinateDispatch() {
+        // Incident at Pusa Road, Karol Bagh (28.6445, 77.1950)
+        DispatchRoutePlan plan = municipalCoordinationService.coordinateDispatch(
+                28.6445, 77.1950, "MAJOR_LEAKAGE: Main water pipe burst near Metro Pillar 118"
+        );
+
+        assertNotNull(plan);
+        assertNotNull(plan.getAssignedDepot());
+        assertEquals("PUSA-BOOSTER-85", plan.getAssignedDepot().getDepotCode());
+        assertTrue(plan.getRoadDistanceKm() > 0);
+        assertTrue(plan.getEstimatedMinutes() >= 5);
+        assertNotNull(plan.getTrafficCondition());
+        assertNotNull(plan.getRecommendedVehicleType());
+        assertNotNull(plan.getRouteCoordinates());
+        assertFalse(plan.getRouteCoordinates().isEmpty());
+        assertNotNull(plan.getRouteGeoJson());
+    }
+
+    @Test
+    @DisplayName("Should list all 6 master emergency depots and 5 active water tankers")
+    void testDepotsAndTankers() {
+        List<EmergencyDepot> depots = municipalCoordinationService.getAllDepots();
+        assertEquals(6, depots.size(), "Should have 6 configured emergency bases across Delhi");
+
+        List<WaterTankerUnit> tankers = municipalCoordinationService.getActiveTankers();
+        assertEquals(5, tankers.size(), "Should have 5 registered DJB tankers");
+        assertTrue(tankers.stream().anyMatch(t -> t.getVehicleNumber().equals("DL-1M-4512")));
+    }
+
+    @Test
+    @DisplayName("Should geocode and search Delhi landmarks correctly")
+    void testLandmarkSearch() {
+        List<Map<String, Object>> pusaResults = municipalCoordinationService.searchLandmarks("Pusa");
+        assertFalse(pusaResults.isEmpty());
+        assertTrue(pusaResults.getFirst().get("name").toString().contains("Pusa"));
+
+        List<Map<String, Object>> connaughtResults = municipalCoordinationService.searchLandmarks("Connaught");
+        assertFalse(connaughtResults.isEmpty());
+        assertTrue(connaughtResults.getFirst().get("name").toString().contains("Connaught Place"));
+    }
+}

@@ -6,17 +6,33 @@ let map;
 let markersLayer;
 let heatmapLayer;
 let clustersLayer;
+let wardsLayer;
+let depotsLayer;
+let tankersLayer;
+let activeRouteLayer;
+let locateLayer;
+let radarLayer;
+let measureLayer;
 let tempClickMarker = null;
+
+let basemapLayers = {};
+let currentBasemap = "osm";
+let isMeasuring = false;
+let measurePoints = [];
+let radarCenter = null;
 
 let allReports = [];
 let allClusters = [];
 let allWards = [];
+let allDepots = [];
+let allTankers = [];
 
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
   initTabNavigation();
   initEventListeners();
+  initLandmarkSearch();
   initAuthAndTracking();
   loadAllData();
 });
@@ -33,17 +49,57 @@ function initMap() {
     zoomControl: true
   });
 
-  // OpenStreetMap Tile Layer
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors | WaterWatch India Civic Platform'
-  }).addTo(map);
+  // Basemap Tile Providers
+  basemapLayers = {
+    osm: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors | WaterWatch India Civic Platform'
+    }),
+    satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19,
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Get mapping, Aero grid, IGN, IGP'
+    }),
+    dark: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }),
+    topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+      maxZoom: 17,
+      attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Style: OpenTopoMap'
+    })
+  };
 
+  // Add default OSM layer
+  basemapLayers.osm.addTo(map);
+
+  // Initialize Layer Groups
   markersLayer = L.layerGroup().addTo(map);
   clustersLayer = L.layerGroup().addTo(map);
+  wardsLayer = L.layerGroup().addTo(map);
+  depotsLayer = L.layerGroup().addTo(map);
+  tankersLayer = L.layerGroup().addTo(map);
+  activeRouteLayer = L.layerGroup().addTo(map);
+  locateLayer = L.layerGroup().addTo(map);
+  radarLayer = L.layerGroup().addTo(map);
+  measureLayer = L.layerGroup().addTo(map);
 
-  // Map Click to Pick Location anywhere in India
+  // Real-time Coordinate HUD on Mouse Move
+  map.on("mousemove", (e) => {
+    updateCoordinateHud(e.latlng.lat, e.latlng.lng);
+  });
+
+  map.on("zoomend", () => {
+    const zoomEl = document.getElementById("hud-zoom");
+    if (zoomEl) zoomEl.textContent = 'z' + map.getZoom();
+  });
+
+  // Map Click Handler (picks incident coords, measurement ruler, or proximity radar)
   map.on("click", (e) => {
+    if (isMeasuring) {
+      handleMeasureClick(e.latlng);
+      return;
+    }
+
     const activeTab = document.querySelector(".nav-tab-btn.active")?.getAttribute("data-tab");
     if (activeTab === "tab-report") {
       const lat = e.latlng.lat.toFixed(6);
@@ -118,6 +174,84 @@ function initEventListeners() {
       map.addLayer(clustersLayer);
     } else {
       map.removeLayer(clustersLayer);
+    }
+  });
+
+  document.getElementById("layer-toggle-wards")?.addEventListener("click", function() {
+    this.classList.toggle("active");
+    if (this.classList.contains("active")) {
+      map.addLayer(wardsLayer);
+    } else {
+      map.removeLayer(wardsLayer);
+    }
+  });
+
+  document.getElementById("layer-toggle-depots")?.addEventListener("click", function() {
+    this.classList.toggle("active");
+    if (this.classList.contains("active")) {
+      map.addLayer(depotsLayer);
+    } else {
+      map.removeLayer(depotsLayer);
+    }
+  });
+
+  document.getElementById("layer-toggle-tankers")?.addEventListener("click", function() {
+    this.classList.toggle("active");
+    if (this.classList.contains("active")) {
+      map.addLayer(tankersLayer);
+    } else {
+      map.removeLayer(tankersLayer);
+    }
+  });
+
+  document.getElementById("layer-toggle-radar")?.addEventListener("click", function() {
+    this.classList.toggle("active");
+    const hud = document.getElementById("proximity-radar-hud");
+    if (this.classList.contains("active")) {
+      map.addLayer(radarLayer);
+      if (hud) hud.style.display = "block";
+      if (!radarCenter) {
+        triggerRadarSweep(28.6445, 77.1950); // Default to Karol Bagh if unset
+      }
+    } else {
+      map.removeLayer(radarLayer);
+      if (hud) hud.style.display = "none";
+    }
+  });
+
+  // Basemap Selector
+  document.getElementById("basemap-selector")?.addEventListener("change", (e) => {
+    const selected = e.target.value;
+    if (basemapLayers[currentBasemap]) {
+      map.removeLayer(basemapLayers[currentBasemap]);
+    }
+    if (basemapLayers[selected]) {
+      basemapLayers[selected].addTo(map);
+      currentBasemap = selected;
+    }
+  });
+
+  // Locate Me Button
+  document.getElementById("btn-locate-me")?.addEventListener("click", handleLocateMe);
+
+  // Geodesic Distance Measurement Tool
+  document.getElementById("btn-measure-tool")?.addEventListener("click", toggleMeasureTool);
+
+  // Close HUD Handlers
+  document.getElementById("btn-close-dispatch-hud")?.addEventListener("click", clearDispatchRoute);
+  document.getElementById("btn-close-radar-hud")?.addEventListener("click", () => {
+    document.getElementById("proximity-radar-hud").style.display = "none";
+    document.getElementById("layer-toggle-radar")?.classList.remove("active");
+    map.removeLayer(radarLayer);
+  });
+
+  // Proximity Radar Radius Slider
+  const slider = document.getElementById("radar-radius-slider");
+  slider?.addEventListener("input", (e) => {
+    const val = parseFloat(e.target.value);
+    document.getElementById("radar-radius-val").textContent = `${val.toFixed(1)} km`;
+    if (radarCenter) {
+      runProximityRadar(radarCenter.lat, radarCenter.lon, val);
     }
   });
 

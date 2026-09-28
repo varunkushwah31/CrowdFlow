@@ -115,6 +115,18 @@
             <button class="layer-toggle active" id="layer-toggle-clusters">
               <i class="fa-solid fa-draw-polygon"></i> DBSCAN Convex Hulls
             </button>
+            <button class="layer-toggle active" id="layer-toggle-wards">
+              <i class="fa-solid fa-map-location-dot"></i> Municipal Wards
+            </button>
+            <button class="layer-toggle active" id="layer-toggle-depots">
+              <i class="fa-solid fa-warehouse"></i> Emergency Depots
+            </button>
+            <button class="layer-toggle active" id="layer-toggle-tankers">
+              <i class="fa-solid fa-truck-droplet"></i> Water Tankers
+            </button>
+            <button class="layer-toggle" id="layer-toggle-radar">
+              <i class="fa-solid fa-bullseye"></i> Proximity Radar
+            </button>
           </div>
 
           <div style="margin-top: 10px;">
@@ -331,8 +343,93 @@
 
     </aside>
 
-    <!-- Center/Right Interactive Map Canvas -->
-    <div id="map"></div>
+    <!-- Center/Right Interactive Map Canvas with Floating Overlays -->
+    <div class="map-container-wrapper">
+      <div id="map"></div>
+
+      <!-- Floating Landmark Geocoder Search -->
+      <div class="map-overlay-top-left">
+        <div class="map-search-box">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text" id="map-landmark-search" placeholder="Search Delhi landmark, ward, metro station..." autocomplete="off"/>
+          <button id="map-search-clear" style="display:none;" title="Clear search"><i class="fa-solid fa-xmark"></i></button>
+          <div id="map-search-results" class="map-search-dropdown" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Floating Basemap Selector & Tactical Tools -->
+      <div class="map-overlay-top-right">
+        <div class="map-tool-group">
+          <select id="basemap-selector" class="map-select-tool" title="Change Base Map">
+            <option value="osm">🗺️ Standard Street (OSM)</option>
+            <option value="satellite">🛰️ Satellite Imagery (Esri)</option>
+            <option value="dark">🌑 Tactical Dark Grid</option>
+            <option value="topo">⛰️ Topographic Elevation</option>
+          </select>
+          <button class="map-tool-btn" id="btn-locate-me" title="GPS Locate Me (India Mobile / Browser)">
+            <i class="fa-solid fa-crosshairs"></i> Locate Me
+          </button>
+          <button class="map-tool-btn" id="btn-measure-tool" title="Geodesic Distance Ruler">
+            <i class="fa-solid fa-ruler-combined"></i> Distance
+          </button>
+        </div>
+      </div>
+
+      <!-- Floating Tactical Emergency Dispatch HUD -->
+      <div id="dispatch-route-hud" class="map-floating-hud" style="display:none;">
+        <div class="hud-header">
+          <div class="hud-title"><i class="fa-solid fa-truck-fast" style="color:var(--primary);"></i> DJB Emergency Fleet Route Plan</div>
+          <button class="hud-close-btn" id="btn-close-dispatch-hud">&times;</button>
+        </div>
+        <div class="hud-body" id="dispatch-hud-content">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Proximity Radar Control Card -->
+      <div id="proximity-radar-hud" class="map-floating-hud" style="display:none;">
+        <div class="hud-header">
+          <div class="hud-title"><i class="fa-solid fa-bullseye" style="color:var(--warning);"></i> Proximity Radar &amp; Affected Outage Radius</div>
+          <button class="hud-close-btn" id="btn-close-radar-hud">&times;</button>
+        </div>
+        <div class="hud-body">
+          <div style="font-size:12px; margin-bottom:8px;">Query Redis Geo for pipeline connections and active grievances within blast radius:</div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <label style="font-size:11px; font-weight:600;">Radius:</label>
+            <input type="range" id="radar-radius-slider" min="0.2" max="5.0" step="0.2" value="1.0" style="flex:1;"/>
+            <span id="radar-radius-val" style="font-size:12px; font-weight:700; width:45px;">1.0 km</span>
+          </div>
+          <div id="radar-affected-summary" style="font-size:12px; color:var(--text-muted);">
+            Click anywhere on the map or an incident pin to trigger live radar sweep.
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating Live Coordinate HUD (Heads-Up Display) -->
+      <div id="coord-hud" class="map-coord-hud">
+        <div class="coord-hud-row">
+          <span class="coord-hud-label">GPS (DD):</span>
+          <span id="hud-dd" class="coord-hud-val">28.632000° N, 77.210500° E</span>
+          <span id="hud-boundary-pill" class="hud-pill in-bounds">DELHI NCR</span>
+        </div>
+        <div class="coord-hud-row">
+          <span class="coord-hud-label">DMS:</span>
+          <span id="hud-dms" class="coord-hud-val">28° 37' 55.20" N, 77° 12' 37.80" E</span>
+          <span class="coord-hud-label" style="margin-left:8px;">Zoom:</span>
+          <span id="hud-zoom" class="coord-hud-val">z13</span>
+        </div>
+        <div class="coord-hud-row">
+          <span class="coord-hud-label">UTM 43N:</span>
+          <span id="hud-utm" class="coord-hud-val">E 715,920m | N 3,169,450m</span>
+        </div>
+        <div class="coord-hud-row">
+          <span class="coord-hud-label">Indian Grid:</span>
+          <span id="hud-grid" class="coord-hud-val">43R-CG-159694</span>
+          <span class="coord-hud-label" style="margin-left:8px;">Plus Code:</span>
+          <span id="hud-plus" class="coord-hud-val">7JWVJ6J6+46</span>
+        </div>
+      </div>
+    </div>
 
   </main>
 

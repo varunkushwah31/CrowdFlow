@@ -40,6 +40,7 @@ public class SecurityConfig {
                         // Geospatial Clusters, PDF Dossiers & Ward Polygons
                         .requestMatchers("/api/clusters", "/api/clusters/**").permitAll()
                         .requestMatchers("/api/wards", "/api/wards/**").permitAll()
+                        .requestMatchers("/api/geo", "/api/geo/**").permitAll()
                         // Media Serving & Municipal Webhooks
                         .requestMatchers("/api/media", "/api/media/**").permitAll()
                         .requestMatchers("/api/municipal/mock-webhook/**").permitAll()
