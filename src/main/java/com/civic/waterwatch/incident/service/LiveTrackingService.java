@@ -11,6 +11,7 @@ import com.civic.waterwatch.incident.repository.WaterReportRepository;
 import com.civic.waterwatch.ward.model.MunicipalWard;
 import com.civic.waterwatch.ward.service.WardRoutingService;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,11 +59,11 @@ public class LiveTrackingService {
         // 5-minute SSE connection timeout
         SseEmitter emitter = new SseEmitter(300_000L);
 
-        activeEmitters.computeIfAbsent(reportCode, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        activeEmitters.computeIfAbsent(reportCode, _ -> new CopyOnWriteArrayList<>()).add(emitter);
 
         emitter.onCompletion(() -> removeEmitter(reportCode, emitter));
         emitter.onTimeout(() -> removeEmitter(reportCode, emitter));
-        emitter.onError(e -> removeEmitter(reportCode, emitter));
+        emitter.onError(_ -> removeEmitter(reportCode, emitter));
 
         // Push initial live tracking snapshot immediately upon connection
         getLiveTracking(reportCode).ifPresent(dto -> {
@@ -79,12 +80,9 @@ public class LiveTrackingService {
         return emitter;
     }
 
+    @Setter
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.civic.waterwatch.redis.RedisPubSubService redisPubSubService;
-
-    public void setRedisPubSubService(com.civic.waterwatch.redis.RedisPubSubService redisPubSubService) {
-        this.redisPubSubService = redisPubSubService;
-    }
 
     /**
      * Broadcasts live update event to all connected citizens tracking this report.
@@ -114,7 +112,7 @@ public class LiveTrackingService {
                     emitter.send(SseEmitter.event()
                             .name("grievance-status")
                             .data(dto));
-                } catch (Exception e) {
+                } catch (Exception _) {
                     deadEmitters.add(emitter);
                 }
             }
@@ -137,10 +135,14 @@ public class LiveTrackingService {
      */
     @Transactional
     public LiveGrievanceTrackingDto submitCitizenFeedback(String reportCode, int rating, String comments) {
-        WaterReport report = reportRepository.findByReportCode(reportCode)
-                .orElseThrow(() -> new IllegalArgumentException("Grievance not found: " + reportCode));
+        if (rating < 1 || rating > 5) {
+            throw new IllegalArgumentException("Citizen satisfaction rating must be between 1 and 5 stars. Submitted: " + rating);
+        }
 
-        report.setCitizenRating(Math.clamp(rating, 1, 5));
+        WaterReport report = reportRepository.findByReportCode(reportCode)
+                .orElseThrow(() -> new com.civic.waterwatch.exception.ReportNotFoundException(reportCode));
+
+        report.setCitizenRating(rating);
         report.setCitizenFeedbackComment(comments);
         report.setFeedbackSubmittedAt(LocalDateTime.now());
         report = reportRepository.save(report);

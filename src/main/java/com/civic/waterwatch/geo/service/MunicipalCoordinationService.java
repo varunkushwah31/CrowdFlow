@@ -175,7 +175,7 @@ public class MunicipalCoordinationService {
      */
     public DispatchRoutePlan coordinateDispatchForCluster(Long clusterId) {
         IncidentCluster cluster = clusterRepository.findById(clusterId)
-                .orElseThrow(() -> new IllegalArgumentException("Cluster not found: " + clusterId));
+                .orElseThrow(() -> new com.civic.waterwatch.exception.ClusterNotFoundException(clusterId));
 
         String desc = cluster.getClusterCode() + ": " +
                 (cluster.getRootCauseHypothesis() != null ? cluster.getRootCauseHypothesis() : "Cluster Emergency");

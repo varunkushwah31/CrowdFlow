@@ -83,7 +83,7 @@ public class OtpAuthService {
         }
 
         if (!valid) {
-            throw new IllegalArgumentException("Invalid OTP provided for phone: " + phoneNumber);
+            throw new com.civic.waterwatch.exception.InvalidOtpException(phoneNumber);
         }
 
         UserRole role = UserRole.ROLE_CITIZEN;

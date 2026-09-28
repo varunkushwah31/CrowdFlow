@@ -6,10 +6,15 @@ import com.civic.waterwatch.clustering.repository.IncidentClusterRepository;
 import com.civic.waterwatch.clustering.service.SpatialClusteringService;
 import com.civic.waterwatch.dispatch.service.CitizenNotificationService;
 import com.civic.waterwatch.dispatch.service.MunicipalDispatchService;
+import com.civic.waterwatch.exception.ClusterNotFoundException;
+import com.civic.waterwatch.exception.InvalidStatusTransitionException;
+import com.civic.waterwatch.incident.service.LiveTrackingService;
 import com.civic.waterwatch.reporting.service.PdfReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -32,7 +38,7 @@ public class IncidentClusterController {
     private final PdfReportService pdfReportService;
     private final MunicipalDispatchService dispatchService;
     private final CitizenNotificationService citizenNotificationService;
-    private final com.civic.waterwatch.incident.service.LiveTrackingService liveTrackingService;
+    private final LiveTrackingService liveTrackingService;
 
     @GetMapping
     @Operation(summary = "List all Indian civic incident clusters")
@@ -42,7 +48,7 @@ public class IncidentClusterController {
 
     @GetMapping("/open")
     @Operation(summary = "List all active, open, and escalated clusters")
-    @org.springframework.cache.annotation.Cacheable(value = "clusters_open", key = "'all'")
+    @Cacheable(value = "clusters_open", key = "'all'")
     public ResponseEntity<List<IncidentCluster>> getOpenClusters() {
         return ResponseEntity.ok(clusterRepository.findOpenClusters());
     }
@@ -52,17 +58,27 @@ public class IncidentClusterController {
     public ResponseEntity<IncidentCluster> getClusterById(@PathVariable Long id) {
         return clusterRepository.findById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ClusterNotFoundException(id));
     }
 
     @PostMapping("/run")
     @Operation(summary = "Trigger the spatial DBSCAN clustering algorithm manually across Indian coordinates")
-    @org.springframework.cache.annotation.CacheEvict(value = "clusters_open", allEntries = true)
+    @CacheEvict(value = "clusters_open", allEntries = true)
     public ResponseEntity<SpatialClusteringService.ClusteringRunSummary> triggerClustering(
             @RequestParam(value = "epsMeters", defaultValue = "150.0") double epsMeters,
             @RequestParam(value = "minPoints", defaultValue = "3") int minPoints,
             @RequestParam(value = "escalationThreshold", defaultValue = "5") int escalationThreshold
     ) {
+        if (epsMeters <= 0) {
+            throw new IllegalArgumentException("epsMeters must be strictly positive (> 0). Submitted: " + epsMeters);
+        }
+        if (minPoints < 1) {
+            throw new IllegalArgumentException("minPoints must be at least 1. Submitted: " + minPoints);
+        }
+        if (escalationThreshold < 1) {
+            throw new IllegalArgumentException("escalationThreshold must be at least 1. Submitted: " + escalationThreshold);
+        }
+
         SpatialClusteringService.ClusteringRunSummary summary = clusteringService.runClustering(epsMeters, minPoints, escalationThreshold);
         return ResponseEntity.ok(summary);
     }
@@ -71,7 +87,7 @@ public class IncidentClusterController {
     @Operation(summary = "Generate and download the official municipal incident dossier PDF (AMRUT/Jal Board standard)")
     public ResponseEntity<Resource> downloadClusterPdf(@PathVariable Long id) {
         IncidentCluster cluster = clusterRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Cluster not found"));
+                .orElseThrow(() -> new ClusterNotFoundException(id));
 
         byte[] pdfBytes = pdfReportService.generateClusterReport(id);
 
@@ -85,7 +101,7 @@ public class IncidentClusterController {
     @Operation(summary = "Manually trigger municipal dispatch (email and webhook) to Jal Board / Ward Engineer")
     public ResponseEntity<Map<String, Object>> escalateCluster(@PathVariable Long id) {
         IncidentCluster cluster = clusterRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Cluster not found"));
+                .orElseThrow(() -> new ClusterNotFoundException(id));
 
         cluster.setStatus(ClusterStatus.ESCALATED);
         cluster.setEscalatedAt(LocalDateTime.now());
@@ -108,13 +124,24 @@ public class IncidentClusterController {
             @RequestBody Map<String, String> body
     ) {
         IncidentCluster cluster = clusterRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Cluster not found"));
+                .orElseThrow(() -> new ClusterNotFoundException(id));
 
         String statusStr = body.get("status");
         String notes = body.get("notes");
 
-        if (statusStr != null) {
-            ClusterStatus newStatus = ClusterStatus.valueOf(statusStr.toUpperCase());
+        if (statusStr != null && !statusStr.isBlank()) {
+            ClusterStatus newStatus;
+            try {
+                newStatus = ClusterStatus.valueOf(statusStr.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                String allowed = Arrays.toString(ClusterStatus.values());
+                throw new InvalidStatusTransitionException(
+                        cluster.getStatus().name(),
+                        statusStr,
+                        allowed
+                );
+            }
+
             cluster.setStatus(newStatus);
             if (notes != null && !notes.isBlank()) {
                 cluster.setStatusNotes(notes);

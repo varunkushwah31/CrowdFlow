@@ -50,7 +50,7 @@ public class PdfReportService {
 
     public byte[] generateClusterReport(Long clusterId) {
         IncidentCluster cluster = clusterRepository.findById(clusterId)
-                .orElseThrow(() -> new IllegalArgumentException("Cluster not found with ID: " + clusterId));
+                .orElseThrow(() -> new com.civic.waterwatch.exception.ClusterNotFoundException(clusterId));
 
         List<WaterReport> reports = reportRepository.findByClusterId(clusterId);
         MunicipalWard ward = null;
@@ -113,9 +113,11 @@ public class PdfReportService {
                     cluster.getClusterCode(), pdfBytes.length, targetFile.toAbsolutePath());
 
             return pdfBytes;
+        } catch (com.civic.waterwatch.exception.ClusterNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to generate PDF for cluster {}: {}", cluster.getClusterCode(), e.getMessage(), e);
-            throw new RuntimeException("PDF generation failed: " + e.getMessage(), e);
+            throw new com.civic.waterwatch.exception.PdfGenerationException(clusterId, e);
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.civic.waterwatch.geo.controller;
 
+import com.civic.waterwatch.exception.InvalidCoordinateException;
 import com.civic.waterwatch.geo.model.CoordinateValidationResult;
 import com.civic.waterwatch.geo.model.DispatchRoutePlan;
 import com.civic.waterwatch.geo.model.EmergencyDepot;
@@ -79,6 +80,12 @@ public class GpsCoordinationController {
             @RequestParam("lon") Double lon,
             @RequestParam(value = "desc", required = false, defaultValue = "CIVIC_WATER_EMERGENCY") String desc
     ) {
+        if (lat == null || lon == null) {
+            throw new InvalidCoordinateException(lat, lon, "Both latitude and longitude parameters are required for emergency dispatch");
+        }
+        if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+            throw new InvalidCoordinateException(lat, lon, "Latitude must be in [-90, 90] and longitude in [-180, 180]");
+        }
         return ResponseEntity.ok(municipalCoordinationService.coordinateDispatch(lat, lon, desc));
     }
 
@@ -95,7 +102,10 @@ public class GpsCoordinationController {
     public ResponseEntity<List<Map<String, Object>>> searchLandmarks(
             @RequestParam("q") String query
     ) {
-        return ResponseEntity.ok(municipalCoordinationService.searchLandmarks(query));
+        if (query == null || query.trim().length() < 2) {
+            throw new IllegalArgumentException("Search query must be at least 2 characters long. Provided: '" + query + "'");
+        }
+        return ResponseEntity.ok(municipalCoordinationService.searchLandmarks(query.trim()));
     }
 
     @GetMapping("/distance")
@@ -106,6 +116,14 @@ public class GpsCoordinationController {
             @RequestParam("lat2") Double lat2,
             @RequestParam("lon2") Double lon2
     ) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
+            throw new InvalidCoordinateException("All 4 coordinate parameters (lat1, lon1, lat2, lon2) must be provided");
+        }
+        if (lat1 < -90.0 || lat1 > 90.0 || lat2 < -90.0 || lat2 > 90.0 ||
+            lon1 < -180.0 || lon1 > 180.0 || lon2 < -180.0 || lon2 > 180.0) {
+            throw new InvalidCoordinateException("Coordinates out of terrestrial bounds [-90, 90] for latitude and [-180, 180] for longitude");
+        }
+
         double distKm = gpsCoordinateService.calculateDistanceKm(lat1, lon1, lat2, lon2);
         double bearing = gpsCoordinateService.calculateBearing(lat1, lon1, lat2, lon2);
         String compass = gpsCoordinateService.getCompassDirection(bearing);

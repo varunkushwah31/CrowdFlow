@@ -1,6 +1,5 @@
 package com.civic.waterwatch.redis;
 
-import com.civic.waterwatch.config.RedisConfig;
 import com.civic.waterwatch.incident.service.LiveTrackingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;

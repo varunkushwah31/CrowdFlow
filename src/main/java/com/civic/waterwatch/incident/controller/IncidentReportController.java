@@ -1,5 +1,8 @@
 package com.civic.waterwatch.incident.controller;
 
+import com.civic.waterwatch.exception.FileValidationException;
+import com.civic.waterwatch.exception.RateLimitExceededException;
+import com.civic.waterwatch.exception.ReportNotFoundException;
 import com.civic.waterwatch.incident.dto.ExifMetadataResult;
 import com.civic.waterwatch.incident.dto.GeoJsonFeatureCollectionDto;
 import com.civic.waterwatch.incident.dto.WaterReportRequestDto;
@@ -7,14 +10,18 @@ import com.civic.waterwatch.incident.dto.WaterReportResponseDto;
 import com.civic.waterwatch.incident.model.IssueType;
 import com.civic.waterwatch.incident.service.ExifParserService;
 import com.civic.waterwatch.incident.service.IncidentReportService;
+import com.civic.waterwatch.incident.service.LiveTrackingService;
+import com.civic.waterwatch.redis.RedisRateLimiterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -26,8 +33,8 @@ public class IncidentReportController {
 
     private final IncidentReportService reportService;
     private final ExifParserService exifParserService;
-    private final com.civic.waterwatch.incident.service.LiveTrackingService liveTrackingService;
-    private final com.civic.waterwatch.redis.RedisRateLimiterService rateLimiterService;
+    private final LiveTrackingService liveTrackingService;
+    private final RedisRateLimiterService rateLimiterService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Submit a water issue report with media upload and automated camera EXIF extraction")
@@ -43,7 +50,7 @@ public class IncidentReportController {
     ) {
         String clientKey = (citizenPhone != null && !citizenPhone.isBlank()) ? citizenPhone : "anonymous-client";
         if (rateLimiterService != null && !rateLimiterService.isAllowed(clientKey, 30, 60)) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+            throw new RateLimitExceededException(clientKey, 30, 60);
         }
 
         WaterReportRequestDto dto = WaterReportRequestDto.builder()
@@ -62,11 +69,11 @@ public class IncidentReportController {
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Submit a water issue report via raw JSON payload")
-    public ResponseEntity<WaterReportResponseDto> submitReportJson(@RequestBody WaterReportRequestDto dto) {
+    public ResponseEntity<WaterReportResponseDto> submitReportJson(@Valid @RequestBody WaterReportRequestDto dto) {
         String clientKey = (dto != null && dto.getCitizenPhone() != null && !dto.getCitizenPhone().isBlank())
                 ? dto.getCitizenPhone() : "anonymous-client";
         if (rateLimiterService != null && !rateLimiterService.isAllowed(clientKey, 30, 60)) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+            throw new RateLimitExceededException(clientKey, 30, 60);
         }
 
         WaterReportResponseDto created = reportService.submitReport(dto, null);
@@ -76,6 +83,9 @@ public class IncidentReportController {
     @PostMapping(value = "/extract-exif", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Preview camera EXIF GPS coordinates and timestamp from an image before saving")
     public ResponseEntity<ExifMetadataResult> extractExifPreview(@RequestPart("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new FileValidationException("file", "Uploaded image file is empty or missing");
+        }
         ExifMetadataResult result = exifParserService.extractMetadata(file);
         return ResponseEntity.ok(result);
     }
@@ -109,12 +119,12 @@ public class IncidentReportController {
     public ResponseEntity<com.civic.waterwatch.incident.dto.LiveGrievanceTrackingDto> trackReport(@PathVariable String reportCode) {
         return liveTrackingService.getLiveTracking(reportCode)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ReportNotFoundException(reportCode));
     }
 
     @GetMapping(value = "/track/{reportCode}/live-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Subscribe to real-time Server-Sent Events (SSE) for live field progress updates")
-    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter streamLiveTracking(@PathVariable String reportCode) {
+    public SseEmitter streamLiveTracking(@PathVariable String reportCode) {
         return liveTrackingService.subscribeLiveUpdates(reportCode);
     }
 
@@ -125,6 +135,9 @@ public class IncidentReportController {
             @RequestParam("rating") int rating,
             @RequestParam(value = "comment", required = false) String comment
     ) {
+        if (rating < 1 || rating > 5) {
+            throw new IllegalArgumentException("Citizen satisfaction rating must be between 1 and 5 stars. Submitted: " + rating);
+        }
         com.civic.waterwatch.incident.dto.LiveGrievanceTrackingDto updated =
                 liveTrackingService.submitCitizenFeedback(reportCode, rating, comment);
         return ResponseEntity.ok(updated);

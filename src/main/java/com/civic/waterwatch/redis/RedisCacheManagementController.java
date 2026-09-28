@@ -126,6 +126,16 @@ public class RedisCacheManagementController {
             @RequestParam("lon") Double lon,
             @RequestParam(value = "radiusKm", defaultValue = "1.0") Double radiusKm
     ) {
+        if (lat == null || lon == null) {
+            throw new com.civic.waterwatch.exception.InvalidCoordinateException("Both 'lat' and 'lon' query parameters are required");
+        }
+        if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+            throw new com.civic.waterwatch.exception.InvalidCoordinateException(lat, lon, "Latitude must be in [-90, 90] and longitude in [-180, 180]");
+        }
+        if (radiusKm == null || radiusKm <= 0.0) {
+            throw new IllegalArgumentException("radiusKm must be strictly positive (> 0). Provided: " + radiusKm);
+        }
+
         long startTime = System.nanoTime();
         List<String> reportCodes = redisGeoSpatialService.findNearbyReportCodes(lat, lon, radiusKm);
         long durationMicros = (System.nanoTime() - startTime) / 1000;

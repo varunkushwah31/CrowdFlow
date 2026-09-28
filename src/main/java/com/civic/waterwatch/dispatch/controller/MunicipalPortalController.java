@@ -44,7 +44,7 @@ public class MunicipalPortalController {
     public ResponseEntity<MunicipalWard> getWardByNumber(@PathVariable Integer wardNumber) {
         return wardRoutingService.findWardByNumber(wardNumber)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new com.civic.waterwatch.exception.WardNotFoundException(wardNumber));
     }
 
     @GetMapping("/wards/geojson")
@@ -107,9 +107,12 @@ public class MunicipalPortalController {
             @RequestParam("lat") Double lat,
             @RequestParam("lon") Double lon
     ) {
+        if (lat == null || lon == null) {
+            throw new com.civic.waterwatch.exception.InvalidCoordinateException("Both 'lat' and 'lon' query parameters are required for ward routing");
+        }
         MunicipalWard ward = wardRoutingService.routeToWard(lat, lon);
         if (ward == null) {
-            return ResponseEntity.notFound().build();
+            throw new com.civic.waterwatch.exception.WardNotFoundException(lat, lon);
         }
 
         boolean directContainment = ward.contains(lat, lon);
