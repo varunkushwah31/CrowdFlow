@@ -34,8 +34,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 25MB
-      max-request-size: 30MB
+      max-file-size: 8MB
+      max-request-size: 8MB
 
   mail:
     host: localhost
@@ -114,7 +114,7 @@ management:
     health:
       show-details: always
     prometheus:
-      enabled: true
+      access: read_only
   health:
     mail:
       enabled: false
