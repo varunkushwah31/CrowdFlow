@@ -1,6 +1,5 @@
 package com.civic.waterwatch.exception;
 
-import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,8 +26,6 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
-import java.util.Set;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Global Exception Handler & RFC 7807 Diagnostics Unit Tests")
@@ -241,7 +238,10 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("Should translate HttpMessageNotReadableException into 400 with MALFORMED_JSON_REQUEST code")
     void testMessageNotReadableException() {
-        HttpMessageNotReadableException ex = new HttpMessageNotReadableException("JSON parse error: Unexpected character");
+        HttpMessageNotReadableException ex = new HttpMessageNotReadableException(
+                "JSON parse error: Unexpected character",
+                new org.springframework.mock.http.MockHttpInputMessage("bad body".getBytes())
+        );
         ResponseEntity<ErrorResponse> response = exceptionHandler.handleMessageNotReadable(ex, request);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());

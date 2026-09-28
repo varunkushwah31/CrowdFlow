@@ -8,32 +8,35 @@ import com.civic.waterwatch.incident.model.IssueType;
 import com.civic.waterwatch.incident.model.ReportStatus;
 import com.civic.waterwatch.incident.model.WaterReport;
 import com.civic.waterwatch.incident.repository.WaterReportRepository;
+import com.civic.waterwatch.redis.RedisGeoSpatialService;
+import com.civic.waterwatch.storage.ObjectStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class IncidentReportService {
 
+    public static final ZoneId IST_ZONE = ZoneId.of("Asia/Kolkata");
+
     private final WaterReportRepository reportRepository;
     private final ExifParserService exifParserService;
     private final ReverseGeocodingService reverseGeocodingService;
     private final ImageOptimizationService imageOptimizationService;
-    private final com.civic.waterwatch.storage.ObjectStorageService objectStorageService;
-    private final com.civic.waterwatch.redis.RedisGeoSpatialService redisGeoSpatialService;
+    private final ObjectStorageService objectStorageService;
+    private final RedisGeoSpatialService redisGeoSpatialService;
 
     @Value("${waterwatch.storage.upload-dir:./uploads}")
     private String uploadDir;
@@ -44,17 +47,25 @@ public class IncidentReportService {
     @Value("${waterwatch.geo.default-lon:77.2105}")
     private double defaultLon;
 
+    private record MediaProcessingResult(
+            Double latitude,
+            Double longitude,
+            LocalDateTime capturedAt,
+            String deviceModel,
+            String storedImageUrl
+    ) {}
+
     @Transactional
-    @org.springframework.cache.annotation.CacheEvict(value = "heatmap", allEntries = true)
+    @CacheEvict(value = "heatmap", allEntries = true)
     public WaterReportResponseDto submitReport(WaterReportRequestDto dto, MultipartFile file) {
         WaterReport report = new WaterReport();
-        report.setReportCode("IND-H2O-" + (1000 + (long) (Math.random() * 9000)));
+        report.setReportCode(generateReportCode());
         report.setIssueType(dto.getIssueType() != null ? dto.getIssueType() : IssueType.OTHER);
         report.setDescription(dto.getDescription());
         report.setCitizenName(dto.getCitizenName());
         report.setCitizenPhone(dto.getCitizenPhone());
         report.setCitizenEmail(dto.getCitizenEmail());
-        report.setReportedAt(LocalDateTime.now());
+        report.setReportedAt(LocalDateTime.now(IST_ZONE));
         report.setStatus(ReportStatus.SUBMITTED);
         report.setMunicipalBody("Delhi Jal Board / MCD");
 
@@ -63,41 +74,16 @@ public class IncidentReportService {
         LocalDateTime capturedAt = null;
         String deviceModel = null;
 
-        if (file != null && !file.isEmpty()) {
-            try {
-                // 1. Extract EXIF metadata (GPS, Timestamp, Device) before PII stripping
-                ExifMetadataResult exifResult = exifParserService.extractMetadata(file);
-                if (exifResult.isHasGps()) {
-                    finalLat = exifResult.getLatitude();
-                    finalLon = exifResult.getLongitude();
-                    log.info("EXIF GPS extracted from Indian citizen upload: Lat {}, Lon {}", finalLat, finalLon);
-                }
-                if (exifResult.getCapturedAt() != null) {
-                    capturedAt = exifResult.getCapturedAt();
-                }
-                if (exifResult.getCameraModel() != null) {
-                    deviceModel = (exifResult.getCameraMake() != null ? exifResult.getCameraMake() + " " : "") + exifResult.getCameraModel();
-                }
-
-                // 2. Sanitize & compress image (auto-orient, strip PII, generate clean JPEG)
-                byte[] rawBytes = file.getBytes();
-                ImageOptimizationService.OptimizedImageResult optResult = imageOptimizationService.processAndSanitizeImage(rawBytes);
-                byte[] bytesToStore = (optResult != null && optResult.getOptimizedImageBytes() != null)
-                        ? optResult.getOptimizedImageBytes()
-                        : rawBytes;
-
-                String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "report_evidence.jpg";
-                String cleanName = System.currentTimeMillis() + "_" + originalName.replaceAll("[^a-zA-Z0-9.-]", "_");
-                if (!cleanName.toLowerCase().endsWith(".jpg") && !cleanName.toLowerCase().endsWith(".jpeg") && !cleanName.toLowerCase().endsWith(".png")) {
-                    cleanName += ".jpg";
-                }
-
-                // 3. Store via unified ObjectStorageService (S3 / MinIO / Local)
-                String storedUrl = objectStorageService.storeMedia(cleanName, bytesToStore, "image/jpeg");
-                report.setImageUrl(storedUrl);
-
-            } catch (Exception e) {
-                log.warn("Failed to store/optimize uploaded media file: {}", e.getMessage());
+        MediaProcessingResult mediaResult = processMediaUpload(file);
+        if (mediaResult != null) {
+            if (mediaResult.latitude() != null && mediaResult.longitude() != null) {
+                finalLat = mediaResult.latitude();
+                finalLon = mediaResult.longitude();
+            }
+            capturedAt = mediaResult.capturedAt();
+            deviceModel = mediaResult.deviceModel();
+            if (mediaResult.storedImageUrl() != null) {
+                report.setImageUrl(mediaResult.storedImageUrl());
             }
         } else if (dto.getImageUrl() != null && !dto.getImageUrl().isBlank()) {
             report.setImageUrl(dto.getImageUrl());
@@ -110,7 +96,7 @@ public class IncidentReportService {
 
         report.setLatitude(finalLat);
         report.setLongitude(finalLon);
-        report.setCapturedAt(capturedAt != null ? capturedAt : LocalDateTime.now());
+        report.setCapturedAt(capturedAt != null ? capturedAt : LocalDateTime.now(IST_ZONE));
         report.setDeviceModel(deviceModel != null ? deviceModel : "Citizen Mobile Client (India)");
 
         ReverseGeocodingService.GeocodedAddress address = reverseGeocodingService.reverseGeocode(finalLat, finalLon);
@@ -128,6 +114,58 @@ public class IncidentReportService {
         }
 
         return WaterReportResponseDto.fromEntity(report);
+    }
+
+    private String generateReportCode() {
+        return "IND-H2O-" + ThreadLocalRandom.current().nextLong(1000, 10000);
+    }
+
+    private MediaProcessingResult processMediaUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return null;
+        }
+
+        Double exifLat = null;
+        Double exifLon = null;
+        LocalDateTime capturedAt = null;
+        String deviceModel = null;
+        String storedUrl = null;
+
+        try {
+            // 1. Extract EXIF metadata (GPS, Timestamp, Device) before PII stripping
+            ExifMetadataResult exifResult = exifParserService.extractMetadata(file);
+            if (exifResult.isHasGps()) {
+                exifLat = exifResult.getLatitude();
+                exifLon = exifResult.getLongitude();
+                log.info("EXIF GPS extracted from Indian citizen upload: Lat {}, Lon {}", exifLat, exifLon);
+            }
+            if (exifResult.getCapturedAt() != null) {
+                capturedAt = exifResult.getCapturedAt();
+            }
+            if (exifResult.getCameraModel() != null) {
+                deviceModel = (exifResult.getCameraMake() != null ? exifResult.getCameraMake() + " " : "") + exifResult.getCameraModel();
+            }
+
+            // 2. Sanitize & compress image (auto-orient, strip PII, generate clean JPEG)
+            byte[] rawBytes = file.getBytes();
+            ImageOptimizationService.OptimizedImageResult optResult = imageOptimizationService.processAndSanitizeImage(rawBytes);
+            byte[] bytesToStore = (optResult != null && optResult.getOptimizedImageBytes() != null)
+                    ? optResult.getOptimizedImageBytes()
+                    : rawBytes;
+
+            String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "report_evidence.jpg";
+            String cleanName = System.currentTimeMillis() + "_" + originalName.replaceAll("[^a-zA-Z0-9.-]", "_");
+            if (!cleanName.toLowerCase().endsWith(".jpg") && !cleanName.toLowerCase().endsWith(".jpeg") && !cleanName.toLowerCase().endsWith(".png")) {
+                cleanName += ".jpg";
+            }
+
+            // 3. Store via unified ObjectStorageService (S3 / MinIO / Local)
+            storedUrl = objectStorageService.storeMedia(cleanName, bytesToStore, "image/jpeg");
+        } catch (Exception e) {
+            log.warn("Failed to store/optimize uploaded media file: {}", e.getMessage());
+        }
+
+        return new MediaProcessingResult(exifLat, exifLon, capturedAt, deviceModel, storedUrl);
     }
 
     public List<WaterReportResponseDto> getAllReports() {
@@ -178,7 +216,7 @@ public class IncidentReportService {
         return featureCollection;
     }
 
-    @org.springframework.cache.annotation.Cacheable(value = "heatmap", key = "'points'")
+    @Cacheable(value = "heatmap", key = "'points'")
     public List<List<Double>> getHeatmapPoints() {
         List<WaterReport> reports = reportRepository.findAll();
         List<List<Double>> points = new ArrayList<>();

@@ -1,16 +1,19 @@
 package com.civic.waterwatch.security.service;
 
+import com.civic.waterwatch.exception.InvalidOtpException;
+import com.civic.waterwatch.redis.RedisOtpService;
 import com.civic.waterwatch.security.jwt.JwtTokenProvider;
 import com.civic.waterwatch.security.model.UserRole;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Service simulating Indian mobile OTP authentication for Citizens and Municipal Ward Officers.
@@ -21,15 +24,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OtpAuthService {
 
     private final JwtTokenProvider jwtTokenProvider;
-
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private com.civic.waterwatch.redis.RedisOtpService redisOtpService;
+    private final RedisOtpService redisOtpService;
 
     // In-memory fallback OTP cache if Redis is unavailable
     private final Map<String, String> activeOtps = new ConcurrentHashMap<>();
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public OtpAuthService(JwtTokenProvider jwtTokenProvider, @org.springframework.beans.factory.annotation.Autowired(required = false) com.civic.waterwatch.redis.RedisOtpService redisOtpService) {
+    @Autowired
+    public OtpAuthService(JwtTokenProvider jwtTokenProvider, @Autowired(required = false) RedisOtpService redisOtpService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.redisOtpService = redisOtpService;
     }
@@ -58,7 +59,7 @@ public class OtpAuthService {
             return redisOtpService.generateAndSaveOtp(cleanPhone);
         }
         // In-memory fallback
-        String otp = String.valueOf((int) ((Math.random() * 900000) + 100000));
+        String otp = String.valueOf(ThreadLocalRandom.current().nextInt(100000, 1000000));
         activeOtps.put(cleanPhone, otp);
         log.info("[CIVIC SMS GATEWAY - FAST2SMS/MSG91 SIMULATION] OTP for {}: {}", cleanPhone, otp);
         return otp;
@@ -83,7 +84,7 @@ public class OtpAuthService {
         }
 
         if (!valid) {
-            throw new com.civic.waterwatch.exception.InvalidOtpException(phoneNumber);
+            throw new InvalidOtpException(phoneNumber);
         }
 
         UserRole role = UserRole.ROLE_CITIZEN;
@@ -108,7 +109,7 @@ public class OtpAuthService {
 
     private String normalizePhoneNumber(String phone) {
         if (phone == null) return "+919876543210";
-        String digits = phone.replaceAll("[^0-9]", "");
+        String digits = phone.replaceAll("\\D", "");
         if (digits.length() == 10) {
             return "+91" + digits;
         }

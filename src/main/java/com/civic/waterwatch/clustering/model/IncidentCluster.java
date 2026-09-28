@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.io.Serial;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "incident_clusters", indexes = {
@@ -22,6 +23,8 @@ public class IncidentCluster implements java.io.Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
+
+    public static final ZoneId IST_ZONE = ZoneId.of("Asia/Kolkata");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,13 +45,16 @@ public class IncidentCluster implements java.io.Serializable {
     @Column(name = "boundary_geojson", columnDefinition = "TEXT")
     private String boundaryGeoJson;
 
+    @Builder.Default
     @Column(name = "report_count", nullable = false)
     private Integer reportCount = 0;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "severity", nullable = false, length = 32)
     private ClusterSeverity severity = ClusterSeverity.MEDIUM;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
     private ClusterStatus status = ClusterStatus.ACTIVE;
@@ -59,6 +65,7 @@ public class IncidentCluster implements java.io.Serializable {
     @Column(name = "ward_name", length = 128)
     private String wardName;
 
+    @Builder.Default
     @Column(name = "municipal_body", length = 128)
     private String municipalBody = "Delhi Jal Board / Municipal Corporation of Delhi";
 
@@ -101,13 +108,13 @@ public class IncidentCluster implements java.io.Serializable {
     @PrePersist
     public void onPrePersist() {
         if (this.createdAt == null) {
-            this.createdAt = LocalDateTime.now();
+            this.createdAt = LocalDateTime.now(IST_ZONE);
         }
         this.updatedAt = this.createdAt;
     }
 
     @PreUpdate
     public void onPreUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now(IST_ZONE);
     }
 }

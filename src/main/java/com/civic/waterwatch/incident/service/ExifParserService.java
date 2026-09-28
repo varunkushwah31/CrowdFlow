@@ -4,6 +4,7 @@ import com.civic.waterwatch.incident.dto.ExifMetadataResult;
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.lang.GeoLocation;
 import com.drew.metadata.Metadata;
+import com.drew.metadata.exif.ExifDirectoryBase;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifSubIFDDirectory;
 import com.drew.metadata.exif.GpsDirectory;
@@ -13,12 +14,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Date;
+import java.time.format.DateTimeFormatter;
 
 @Service
 @Slf4j
 public class ExifParserService {
+
+    private static final DateTimeFormatter EXIF_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss");
 
     public ExifMetadataResult extractMetadata(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -54,20 +56,24 @@ public class ExifParserService {
                 }
             }
 
-            // 2. Extract Timestamp
+            // 2. Extract Timestamp via java.time API using static ExifDirectoryBase access
             ExifSubIFDDirectory subIfdDirectory = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
             if (subIfdDirectory != null) {
-                Date originalDate = subIfdDirectory.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
-                if (originalDate != null) {
-                    result.setCapturedAt(originalDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
+                String dateStr = subIfdDirectory.getString(ExifDirectoryBase.TAG_DATETIME_ORIGINAL);
+                if (dateStr != null && !dateStr.isBlank()) {
+                    try {
+                        result.setCapturedAt(LocalDateTime.parse(dateStr.trim(), EXIF_DATE_FORMATTER));
+                    } catch (Exception parseEx) {
+                        log.debug("Could not parse EXIF date string '{}': {}", dateStr, parseEx.getMessage());
+                    }
                 }
             }
 
-            // 3. Extract Device & Camera Info
+            // 3. Extract Device & Camera Info using static ExifDirectoryBase access
             ExifIFD0Directory ifd0Directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
             if (ifd0Directory != null) {
-                result.setCameraMake(ifd0Directory.getString(ExifIFD0Directory.TAG_MAKE));
-                result.setCameraModel(ifd0Directory.getString(ExifIFD0Directory.TAG_MODEL));
+                result.setCameraMake(ifd0Directory.getString(ExifDirectoryBase.TAG_MAKE));
+                result.setCameraModel(ifd0Directory.getString(ExifDirectoryBase.TAG_MODEL));
             }
 
             if (result.isHasGps()) {

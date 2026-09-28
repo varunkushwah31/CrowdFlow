@@ -1,14 +1,11 @@
 package com.civic.waterwatch;
 
 import com.civic.waterwatch.clustering.model.ClusterSeverity;
-import com.civic.waterwatch.clustering.model.ClusterStatus;
 import com.civic.waterwatch.clustering.model.IncidentCluster;
 import com.civic.waterwatch.clustering.repository.IncidentClusterRepository;
 import com.civic.waterwatch.clustering.service.SpatialClusteringService;
 import com.civic.waterwatch.dispatch.model.DispatchLog;
 import com.civic.waterwatch.dispatch.repository.DispatchLogRepository;
-import com.civic.waterwatch.incident.model.IssueType;
-import com.civic.waterwatch.incident.model.ReportStatus;
 import com.civic.waterwatch.incident.model.WaterReport;
 import com.civic.waterwatch.incident.repository.WaterReportRepository;
 import com.civic.waterwatch.reporting.service.PdfReportService;
@@ -49,6 +46,10 @@ class WaterWatchIntegrationTest {
     @Test
     @DisplayName("Should successfully load Spring context on Java 25 and initialize Indian civic wards")
     void testContextLoadsAndWardsSeeded() {
+        assertNotNull(clusteringService, "SpatialClusteringService bean should be loaded");
+        assertNotNull(pdfReportService, "PdfReportService bean should be loaded");
+        assertNotNull(dispatchLogRepository, "DispatchLogRepository bean should be loaded");
+
         List<MunicipalWard> wards = wardRepository.findAll();
         assertFalse(wards.isEmpty(), "Wards should be seeded on startup");
         assertTrue(wards.stream().anyMatch(w -> w.getWardNumber() == 85), "Ward 85 (Karol Bagh - DJB) should exist");

@@ -34,6 +34,7 @@ public class MunicipalWard implements java.io.Serializable {
     @Column(name = "municipal_body", length = 128)
     private String municipalBody; // Delhi Jal Board (DJB) / MCD
 
+    @Builder.Default
     @Column(name = "state", length = 64)
     private String state = "Delhi / India";
 
