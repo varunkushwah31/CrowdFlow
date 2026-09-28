@@ -37,8 +37,10 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // Static Dashboard & Assets
-                        .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                        // Static Dashboard & Assets (Citizen UI & React Admin UI)
+                        .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/favicon.ico", "/admin", "/admin/**").permitAll()
+                        // Dedicated Administrative APIs restricted strictly to Government Ward Officers & Super Admins
+                        .requestMatchers("/api/admin/**").hasAnyRole("WARD_OFFICER", "SUPER_ADMIN")
                         // Public Auth Endpoints (OTP)
                         .requestMatchers("/api/auth/**").permitAll()
                         // Crowdsourced Report Intake & GeoJSON / Heatmap Streaming
